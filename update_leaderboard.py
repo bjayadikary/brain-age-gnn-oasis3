@@ -3,14 +3,13 @@ import pandas as pd
 from io import StringIO
 
 def calculate_mae(ground_truth_df, prediction_df):
-    # Ensure columns are correct
     merged = pd.merge(ground_truth_df, prediction_df, on='subject_session', suffixes=('_true', '_pred'))
     if merged.empty:
         return None
     mae = (merged['age_at_visit_true'] - merged['age_at_visit_pred']).abs().mean()
     return round(mae, 4)
 
-# 1. Load Ground Truth from GitHub Secret
+# 1. Load Ground Truth
 gt_data = os.getenv('TEST_LABELS')
 if not gt_data:
     print("Error: TEST_LABELS secret not found.")
@@ -19,7 +18,7 @@ gt_df = pd.read_csv(StringIO(gt_data))
 
 leaderboard_data = []
 
-# 2. Scan the submissions folder
+# 2. Scan submissions
 submissions_dir = 'submissions'
 if os.path.exists(submissions_dir):
     for team_name in os.listdir(submissions_dir):
@@ -35,7 +34,7 @@ if os.path.exists(submissions_dir):
             except Exception as e:
                 print(f"Error processing {team_name}: {e}")
 
-# 3. Create Leaderboard and Sort (Lower MAE is better)
+# 3. Create Leaderboard and Save Files
 if leaderboard_data:
     leaderboard_df = pd.DataFrame(leaderboard_data).sort_values(by="MAE")
     leaderboard_df.insert(0, 'Rank', range(1, len(leaderboard_df) + 1))
@@ -48,6 +47,28 @@ if leaderboard_data:
     header = "# 🏆 Competition Leaderboard\n\n*Last Updated: Automatically*\n\n"
     with open('leaderboard/leaderboard.md', 'w') as f:
         f.write(header + markdown_table)
-    print("Leaderboard updated successfully.")
+
+    # 6. Generate HTML version (OUTSIDE the else block)
+    html_table = leaderboard_df.to_html(classes='table table-striped', index=False)
+    html_content = f"""
+    <html>
+    <head>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css">
+        <title>Leaderboard</title>
+    </head>
+    <body class="container mt-5">
+        <h1>🏆 Competition Leaderboard</h1>
+        <p>Last Updated: Automatically</p>
+        {html_table}
+        <br>
+        <a href="../index.html">Back to Home</a>
+    </body>
+    </html>
+    """
+    # Saving to the leaderboard folder to match your URL structure
+    with open('leaderboard/leaderboard.html', 'w') as f:
+        f.write(html_content)
+    
+    print("Leaderboard updated successfully (CSV, MD, and HTML).")
 else:
     print("No submissions found to rank.")
