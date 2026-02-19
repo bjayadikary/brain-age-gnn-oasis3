@@ -1,0 +1,56 @@
+name: Score Submission
+
+on:
+  pull_request:
+    paths:
+      - 'submissions/**'
+      - '!submissions/README.md'
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write # This allows the bot to comment
+      contents: write      # This allows the bot to update the leaderboard
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install pandas scikit-learn pyyaml
+
+      - name: Run Evaluation
+        id: eval_step
+        env:
+          TEST_LABELS: ${{ secrets.TEST_LABELS }}
+        run: |
+          # 1. Find the predictions.csv in the submissions folder
+          SUBMISSION_FILE=$(find submissions -name "predictions.csv" | head -n 1)
+          
+          # 2. Run the script and capture the score
+          # We use 'tee' so we can see the output in the GitHub logs too
+          python competition/evaluate.py --file "$SUBMISSION_FILE" | tee evaluation_output.txt
+          
+          # 3. Save the score as a variable for the next step
+          SCORE=$(grep "SCORE_MAE" evaluation_output.txt | awk '{print $2}')
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
+
+      - name: Post Score to Pull Request
+        uses: mshick/add-pr-comment@v2
+        if: always() # Run this even if evaluation fails so you can see the error
+        with:
+          message: |
+            ## 🧠 Brain-Age GNN Result
+            
+            **Metric:** Mean Absolute Error (MAE)
+            **Your Score:** `${{ steps.eval_step.outputs.score }}`
+            
+            *Note: A lower MAE means better performance.*
