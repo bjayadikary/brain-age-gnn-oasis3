@@ -9,47 +9,50 @@ def evaluate(submission_file_path):
     try:
         submission_df = pd.read_csv(submission_file_path)
     except Exception as e:
-        raise ValueError(f"Could not read submission CSV: {e}")
+        print(f"ERROR: Could not read submission CSV - {e}")
+        return
 
     # 2. Load Ground Truth from GitHub Secret
     secret_data = os.getenv('TEST_LABELS')
     if not secret_data:
-        raise ValueError("Ground truth labels (TEST_LABELS) not found in environment")
+        print("ERROR: TEST_LABELS secret is not set in GitHub.")
+        return
     
     true_df = pd.read_csv(io.StringIO(secret_data))
 
-    # 3. Standardize column names to lowercase for robust matching
+    # 3. Standardize column names to lowercase
     true_df.columns = true_df.columns.str.lower()
     submission_df.columns = submission_df.columns.str.lower()
 
-    # 4. Alignment & Validation
-    if 'subject_session' not in submission_df.columns:
-        raise ValueError("Submission must contain 'subject_session' column")
+    # 4. Validation: Check for required columns
+    required_cols = ['subject_session', 'age_at_visit']
+    for col in required_cols:
+        if col not in submission_df.columns:
+            print(f"ERROR: Missing required column '{col}'")
+            return
 
-    # Check if all required IDs are present
+    # 5. Alignment
+    # Ensure all required IDs are present in the submission
     missing = set(true_df['subject_session']) - set(submission_df['subject_session'])
     if missing:
-        raise ValueError(f"Missing IDs in submission: {list(missing)[:5]}...")
+        print(f"ERROR: Submission is missing {len(missing)} IDs. First few: {list(missing)[:3]}")
+        return
     
-    # Merge data on the ID column
+    # Merge on the ID column
     merged = pd.merge(true_df, submission_df, on='subject_session', suffixes=('_true', '_pred'))
 
-    # 5. Calculate Metrics
-    # Ensure these match the secret labels exactly: 'age_at_visit'
+    # 6. Calculate Metric
     y_true = merged['age_at_visit_true']
     y_pred = merged['age_at_visit_pred']
 
     mae = mean_absolute_error(y_true, y_pred)
     
-    # We print the score so the GitHub Action can see it in the logs
+    # This print statement is the 'handshake' with the GitHub Action
     print(f"SCORE_MAE: {round(mae, 5)}")
-    
-    return mae
 
-# This block handles the "--file" argument from your .yml workflow
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--file', type=str, required=True, help="Path to predictions.csv")
+    parser.add_argument('--file', type=str, required=True, help="Path to the predictions.csv")
     args = parser.parse_args()
     
     evaluate(args.file)
