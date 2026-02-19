@@ -88,31 +88,27 @@ data/public/sample_submission.csv
 
 ## 4. How to Submit
 
-1. Fork this repository
-2. Create a new folder:
-```
-submissions/inbox/<team_name>/<run_id>/
-```
-3. Add:
-   - `predictions.csv`
-   - `metadata.json`
+### 1. Prepare your Submission
+Your submission must be a folder containing:
+- `predictions.csv`: Your model's predictions.
+- `metadata.json`: Information about your team and model.
 
-Example `metadata.json`:
-```json
-{
-  "team": "example_team",
-  "model": "llm-only",
-  "llm_name": "gpt-x",
-  "notes": "Temporal GNN with class weighting"
-}
-```
+**`predictions.csv` Format:**
+The file must have exactly these two headers:
+| subject_session | age_at_visit |
+|:----------------|:-------------|
+| Test_Sub_001-Sess_01 | 70.5 |
+| Test_Sub_001-Sess_02 | 72.1 |
 
-4. Open a Pull Request to `main`
+### 2. The Folder Structure
+In your forked repository, place your files here:
+`submissions/<your_team_name>/predictions.csv`
 
-The PR will be **automatically scored** and the result posted as a comment.
-
----
-
+### 3. Submit via Pull Request
+1. **Fork** this repository.
+2. **Upload** your folder to the `submissions/` directory.
+3. Open a **Pull Request (PR)** to the main repository.
+4. Wait ~1 minute. A bot will automatically calculate your **MAE** and post it as a comment on your PR!
 ## 5. Leaderboard
 
 After a PR is merged, the submission is added to:
