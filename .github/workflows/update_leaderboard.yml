@@ -1,0 +1,38 @@
+name: Update Leaderboard
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'submissions/**'  # Only runs when a new submission is merged to main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: pip install pandas tabulate
+
+      - name: Run Leaderboard Script
+        env:
+          TEST_LABELS: ${{ secrets.TEST_LABELS }}
+        run: python update_leaderboard.py
+
+      - name: Commit and Push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add leaderboard/leaderboard.md leaderboard/leaderboard.csv
+          git commit -m "Auto-update leaderboard [skip ci]" || exit 0
+          git push
