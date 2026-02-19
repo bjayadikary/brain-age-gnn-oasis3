@@ -87,7 +87,6 @@ data/public/sample_submission.csv
 ---
 
 ## 4. How to Submit
-
 ### 1. Prepare your Submission
 Your submission must be a folder containing:
 - `predictions.csv`: Your model's predictions.
@@ -109,6 +108,8 @@ In your forked repository, place your files here:
 2. **Upload** your folder to the `submissions/` directory.
 3. Open a **Pull Request (PR)** to the main repository.
 4. Wait ~1 minute. A bot will automatically calculate your **MAE** and post it as a comment on your PR!
+---
+
 ## 5. Leaderboard
 
 After a PR is merged, the submission is added to:
