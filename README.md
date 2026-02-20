@@ -18,8 +18,8 @@ Create a folder in `submissions/` named after your team:
 Your `predictions.csv` must contain exactly two columns:
 | subject_session | age_at_visit |
 | :--- | :--- |
-| Test_Sub_001-Sess_01 | 70.52 |
-| Test_Sub_002-Sess_01 | 62.38 |
+| Test_Sub_001-Sess_01 | 70.5245 |
+| Test_Sub_002-Sess_01 | 62.3873 |
 
 
 ### 3. Submission via Pull Request
