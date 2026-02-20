@@ -33,6 +33,6 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
-          git add leaderboard/leaderboard.md leaderboard/leaderboard.csv leaderboard/leaderboard.html
+          git add leaderboard/leaderboard.md leaderboard/leaderboard.csv leaderboard.html
           git commit -m "Auto-update leaderboard [skip ci]" || exit 0
           git push

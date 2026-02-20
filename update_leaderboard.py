@@ -65,10 +65,10 @@ if leaderboard_data:
     </body>
     </html>
     """
-    # Saving to the leaderboard folder to match your URL structure
-    with open('leaderboard/leaderboard.html', 'w') as f:
+    # Save to root instead of the leaderboard/ folder 
+    with open('leaderboard.html', 'w') as f:
         f.write(html_content)
     
-    print("Leaderboard updated successfully (CSV, MD, and HTML).")
+    print("Leaderboard updated successfully (CSV/MD in leaderboard/ and HTML in root).")
 else:
     print("No submissions found to rank.")
