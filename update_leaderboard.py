@@ -2,12 +2,18 @@ import os
 import pandas as pd
 from io import StringIO
 
+
 def calculate_mae(ground_truth_df, prediction_df):
+    # Ensure we are joining on the ID column
+    # suffixes=('_true', '_pred') turns 'age_at_visit' into 'age_at_visit_true' and 'age_at_visit_pred'
     merged = pd.merge(ground_truth_df, prediction_df, on='subject_session', suffixes=('_true', '_pred'))
+    
     if merged.empty:
+        print("Error: No matching subject_session IDs found between GT and Submission.")
         return None
-    # Assuming columns are 'age_at_visit' (GT) and 'age_at_visit_pred' (Submissions)
-    mae = (merged['age_at_visit'] - merged['age_at_visit_pred']).abs().mean()
+    
+    # Use the suffixed names created by the merge
+    mae = (merged['age_at_visit_true'] - merged['age_at_visit_pred']).abs().mean()
     return round(mae, 4)
 
 # 1. Load Ground Truth from Environment Secret
