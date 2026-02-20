@@ -1,12 +1,36 @@
 # 🧠 Brain-Age Prediction Challenge
-This challenge is about predicting chronological age of cognitively healthy adults using Graph Neural Networks (GNNs), applied to FreeSurfer-derived Structural MRI features from OASIS-3 dataset.
+The challenge is to predict chronological age of cognitively healthy adults using Graph Neural Networks (GNNs), applied to FreeSurfer-derived Structural MRI features from OASIS-3 dataset.
 
 * **Task:** Regression
 * **Target:** `age_at_visit` (in years)
 * **Primary Metric:** Mean Absolute Error (MAE)
 
+---
+
+## 📝 Submission Instructions
+To ensure your score is automatically calculated and added to the leaderboard, please follow these steps:
+
+### 1. Folder Structure
+Create a folder in `submissions/` named after your team:
+`submissions/<your_team_name>/predictions.csv`
+
+### 2. CSV Format
+Your `predictions.csv` must contain exactly two columns:
+| subject_session | age_at_visit |
+| :--- | :--- |
+| Test_Sub_001-Sess_01 | 70.52 |
+| Test_Sub_002-Sess_01 | 62.38 |
 
 
+### 3. Submission via Pull Request
+1.  **Fork** this repository.
+2.  Add your team folder and file.
+3.  Submit a **Pull Request (PR)** to the `main` branch. 
+
+## 🏆 Leaderboard
+Evaluation is performed automatically using **Mean Absolute Error (MAE)**. Once your PR is merged, the official rankings are updated.
+
+👉 **[View the Live Leaderboard Here](https://bjayadikary.github.io/brain-age-gnn-oasis3/leaderboard.html)**
 
 
 
