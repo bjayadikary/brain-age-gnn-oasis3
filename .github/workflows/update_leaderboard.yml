@@ -5,7 +5,11 @@ on:
     branches:
       - main
     paths:
-      - 'submissions/**'  # Only runs when a new submission is merged to main
+      - 'submissions/**' 
+  workflow_dispatch: # Allows you to manually trigger the update from the Actions tab
+
+permissions:
+  contents: write # Grants the bot permission to push changes to your repo
 
 jobs:
   build:
@@ -22,7 +26,9 @@ jobs:
           python-version: '3.9'
 
       - name: Install dependencies
-        run: pip install pandas tabulate
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas tabulate
 
       - name: Run Leaderboard Script
         env:
@@ -33,6 +39,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          # This adds the CSV/MD in the folder AND the HTML in the root
           git add leaderboard/leaderboard.md leaderboard/leaderboard.csv leaderboard.html
           git commit -m "Auto-update leaderboard [skip ci]" || exit 0
-          git push
+          git push origin main
