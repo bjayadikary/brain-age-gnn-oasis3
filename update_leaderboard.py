@@ -67,8 +67,10 @@ if leaderboard_data:
     with open('leaderboard/leaderboard.md', 'w') as f:
         f.write("# 🏆 Leaderboard\n\n" + display_df.to_markdown(index=False))
 
+
     # 5. Generate Flashy HTML for GitHub Pages
-    html_table = display_df.to_html(classes='table table-hover', index=False, escape=False)
+    # Added 'text-center' to the table classes to fix alignment
+    html_table = display_df.to_html(classes='table table-hover text-center', index=False, escape=False)
     
     html_content = f"""
     <!DOCTYPE html>
@@ -81,18 +83,21 @@ if leaderboard_data:
         <style>
             body {{ background-color: #f4f7f6; font-family: 'Inter', sans-serif; padding: 40px 0; }}
             .leaderboard-card {{ background: white; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); overflow: hidden; max-width: 800px; margin: auto; }}
-            .header-section {{ background: linear-gradient(135deg, #0f172a 0%, #334155 100%); color: white; padding: 40px 20px; text-center; }}
-            th {{ background-color: #f8fafc !important; color: #64748b; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; }}
-            td {{ vertical-align: middle; font-size: 1rem; }}
+            .header-section {{ background: linear-gradient(135deg, #0f172a 0%, #334155 100%); color: white; padding: 40px 20px; }}
+            
+            /* Ensures headers and cells align perfectly */
+            table {{ width: 100% !important; margin-bottom: 0 !important; }}
+            th {{ background-color: #f8fafc !important; color: #64748b; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em; text-align: center; padding: 15px !important; }}
+            td {{ vertical-align: middle; font-size: 1rem; padding: 15px !important; text-align: center; }}
+            
             .mae-value {{ font-family: 'monospace'; font-weight: bold; color: #059669; }}
         </style>
     </head>
     <body>
         <div class="leaderboard-card">
             <div class="header-section text-center">
-                <h1 class="fw-bold">🧠 Brain-Age Prediction Challenge</h1>
-                <p>OASIS-3 GNN Benchmark Leaderboard</p>
-                <div class="badge bg-primary">Last Updated: {pd.Timestamp.now().strftime('%b %d, %H:%M UTC')}</div>
+                <h1 class="fw-bold">🧠 Brain-Age Prediction Challenge Leaderboard</h1>
+                <div class="badge bg-primary mt-2">Last Updated: {pd.Timestamp.now().strftime('%b %d, %H:%M UTC')}</div>
             </div>
             <div class="table-responsive">
                 {html_table}
@@ -101,6 +106,7 @@ if leaderboard_data:
     </body>
     </html>
     """
+    
     with open('leaderboard.html', 'w') as f:
         f.write(html_content)
     print("Files updated successfully.")
