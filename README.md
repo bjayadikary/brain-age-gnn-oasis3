@@ -7,6 +7,34 @@ The challenge is to predict chronological age of cognitively healthy adults usin
 
 ---
 
+## 📊 Dataset Description
+The dataset is curated from the **OASIS-3** longitudinal cohort. To ensure a "pure" aging baseline, we selected individuals who remained cognitively normal at **all** available visits (no MCI or dementia diagnoses).
+
+* **Cohort:** 288 subjects (431 total sessions).
+* **Preprocessing:** MRI scans processed via the **FreeSurfer** pipeline.
+* **Atlas:** Cortical regions defined by the **Desikan-Killiany atlas** (68 cortical regions; 34 per hemisphere).
+
+---
+
+## 📐 Graph Specifications
+Each MRI session is represented as a graph:
+
+* **Nodes ($N=68$):** Representing the 68 cortical regions.
+* **Node Features:** A 2D vector per region:
+    1.  **Cortical Thickness** (mm)
+    2.  **Gray Matter Volume** (mm³)
+    * *Total Features:* 68 nodes $\times$ 2 metrics = 136 structural features per graph.
+* **Edges:** Weighted by **dMRI Streamline Counts** (Fiber Counts) between regions. Adjacency matrices are provided for each session.
+* **Target:** Scalar **Age at Visit** (years).
+
+## 📂 Repository Structure
+* `data/public/train_data.csv`: 230 patients (353 sessions) with labels.
+* `data/public/val_data.csv`: 29 patients (39 sessions) for validation.
+* `data/public/test_data.csv`: Sessions for evaluation (target column omitted).
+* `data/public/adjacency_matrices/`: Weighted connectivity matrices for each session.
+
+---
+
 ## 📝 Submission Instructions
 To ensure your score is automatically calculated and added to the leaderboard, please follow these steps:
 
