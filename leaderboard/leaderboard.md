@@ -1,7 +1,5 @@
-# 🏆 Competition Leaderboard
+# 🏆 Leaderboard
 
-*Last Updated: Automatically*
-
-|   Rank | Team      |    MAE |
-|-------:|:----------|-------:|
-|      1 | test_team | 5.6199 |
+| Rank   | Team      |    MAE |
+|:-------|:----------|-------:|
+| 🥇 1st  | test_team | 5.6199 |
