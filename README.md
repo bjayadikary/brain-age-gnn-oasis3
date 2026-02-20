@@ -1,3 +1,25 @@
+# 🧠 Brain-Age Prediction Challenge
+This challenge is about predicting chronological age of cognitively healthy adults using Graph Neural Networks (GNNs), applied to FreeSurfer-derived Structural MRI features from OASIS-3 dataset.
+
+* **Task:** Regression
+* **Target:** `age_at_visit` (in years)
+* **Primary Metric:** Mean Absolute Error (MAE)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 # GNN Coding Competition Template
 
