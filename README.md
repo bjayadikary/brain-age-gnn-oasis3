@@ -64,13 +64,13 @@ Each MRI session is represented as a graph:
 │   └── leaderboard.js
 |
 ├── keys/
-│    └──public_key.pem
+│    └──public_key.pem               # Use this key during encryption step
 │
 ├── submissions/
-│   ├── <team_name>/
+│   ├── <team_name>/                 # Your encrypted submission goes here
 │   │   ├── predictions.enc
 │   │   └── metadata.json
-│   └── encrypt_submission.py
+│   └── encrypt_submission.py        # Script for participants to encrypt their submission results
 │
 ├── leaderboard/
 │   ├── leaderboard.csv
@@ -119,35 +119,57 @@ print(adj_df.shape)  # Output: (68, 68)
 ---
 
 ## 📝 Submission Instructions
+To protect your model strategy and ensure a fair competition, all submissions must be **encrypted** before being uploaded to GitHub.
 
-To participate in the challenge and get your score on the leaderboard, please follow these steps exactly:
+### 1️⃣ Prepare Your Results
 
-### 1. Prepare Your Submission Files
-You need to prepare two files:
-* **`predictions.csv`**: Must contain exactly two columns: `subject_session` and `age_at_visit`. 
-    * *Note:* The `subject_session` is the concatenation of the `Subject` and `MR_session` values from `test_data.csv` (e.g., `Test_Sub_001-Sess_01`).
-* **`metadata.json`**: A file containing your team name, llm_name and any other relevant information.
+Generate a `predictions.csv` file with **exactly two columns**:
 
-**Sample Format for `predictions.csv`:**
-| subject_session | age_at_visit |
-| :--- | :--- |
-| Test_Sub_001-Sess_01 | 66.03828 |
-| Test_Sub_001-Sess_02 | 66.35320 |
-| Test_Sub_002-Sess_01 | 63.15323 |
+- `subject_session`
+- `age_at_visit`
+
+> **Note:** `subject_session` is the concatenation of the `Subject` and `MR_session` values from `test_data.csv`  
+> Example: `Test_Sub_001-Sess_01`
+
+#### 📄 Sample Format for `predictions.csv`
+
+| subject_session        | age_at_visit |
+| :--------------------- | :----------- |
+| Test_Sub_001-Sess_01   | 66.03828     |
+| Test_Sub_001-Sess_02   | 66.35320     |
+| Test_Sub_002-Sess_01   | 63.15323     |
 
 > 💡 A template is provided at: `data/public/sample_submission.csv`
 
-### 2. Submit via Pull Request
-1.  **Fork** this repository.
-2.  **Create a folder** named after your team under the `submissions/` directory: `submissions/<your_team_name>/`.
-3.  **Upload** your `predictions.csv` and `metadata.json` into that folder.
-4.  **Open a Pull Request (PR)** to the `main` branch of this repository.
+### 2. Install Encryption Dependencies
+Ensure you have the required cryptography library installed in your local environment:
+```bash
+pip install pycryptodome pandas
+```
 
-### 3. Automated Scoring
-* **Wait ~1-2 minutes.** Our automated bot will trigger as soon as you open the PR.
+### 3. Encrypt Your Submission
+You must use the provided public key keys/public_key.pem to encrypt your results. Run the encryption script as follows:
+```bash
+    python submissions/encrypt_submission.py \
+        --input path/to/your/predictions.csv \
+        --key keys/public_key.pem \
+        --output submissions/<your_team_name>/predictions.enc
+```
+   This will generate an encrypted file ```predictions.enc```
+
+### 5. Submit via Pull Request
+1. **Fork** this repository.
+2. **Create a folder** named after your team: `submissions/<your_team_name>/`.
+3. **Upload** exactly two files:
+    * `predictions.enc` (The encrypted file you generated)
+    * `metadata.json`
+4. **Open a Pull Request (PR)**.
+   
+### 6. Automated Scoring
+* Wait ~1-2 minutes. Bot will use a securely stored private key to decrypt and score your submission.
 * The bot will calculate your **Mean Absolute Error (MAE)** and post it as a comment directly on your PR!
 * Once your PR is merged, your results will be officially added to the leaderboard.
-
+   
 ---
 
 ## 🏆 Leaderboard
