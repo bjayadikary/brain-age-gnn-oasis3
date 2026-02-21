@@ -63,13 +63,19 @@ Each MRI session is represented as a graph:
 │   ├── leaderboard.html
 │   └── leaderboard.js
 |
+├── keys/
+│    └──public_key.pem
+│
 ├── submissions/
-│   ├── README.md
-│   └── inbox/
+│   ├── <team_name>/
+│   │   ├── predictions.enc
+│   │   └── metadata.json
+│   └── encrypt_submission.py
 │
 ├── leaderboard/
 │   ├── leaderboard.csv
 │   └── leaderboard.md
+│
 ├── leaderboard.html
 └── README.md
 
