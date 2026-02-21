@@ -31,6 +31,51 @@ Each MRI session is represented as a graph:
 
 ## 📂 Repository Structure
 
+```
+.
+└── .github/workflows/
+|    ├── score_submission.yml
+|    ├── update_leaderboard.yml
+|
+├── competition/
+│   ├── config.yaml
+│   ├── evaluate.py
+│   ├── metrics.py
+│   └── render_leaderboard.py
+|   └── validate_submission.py
+|
+├── data/
+│   ├── public/
+│   │   └── adjacency_matrices
+│   │   |    └── OAS30001_d0757.csv
+│   │   |    └── OAS30001_d3132.csv
+│   │   |    └── ...
+│   │   |
+│   │   └── train_data.csv
+│   │   └── val_data.csv
+│   │   └── test_data.csv
+│   │
+│   └── sample/
+│       └── predictions.csv   
+|
+├── docs/
+│   ├── leaderboard.css
+│   └── leaderboard.html
+│   └── leaderboard.js
+|
+├── submissions/
+│   ├── README.md
+│   └── inbox/
+│
+├── leaderboard/
+│   ├── leaderboard.csv
+│   └── leaderboard.md
+└── leaderboard.html
+└── README.md
+
+```
+
+
 The dataset (431 total sessions) is split approximately into **80% Training**, **10% Validation**, and **10% Testing**. The split was performed at the **subject level** (ensuring no subject appears in more than one set) and was **stratified by age** to ensure a balanced distribution across all subsets.
 
 * **`data/public/train_data.csv`**: 
@@ -68,202 +113,41 @@ print(adj_df.shape)  # Output: (68, 68)
 ---
 
 ## 📝 Submission Instructions
-To ensure your score is automatically calculated and added to the leaderboard, please follow these steps:
 
-### 1. Folder Structure
-Create a folder in `submissions/` named after your team:
-`submissions/<your_team_name>/predictions.csv`
+To participate in the challenge and get your score on the leaderboard, please follow these steps exactly:
 
-### 2. CSV Format
-Your `predictions.csv` must contain exactly two columns:
+### 1. Prepare Your Submission Files
+You need to prepare two files:
+* **`predictions.csv`**: Must contain exactly two columns: `subject_session` and `age_at_visit`. 
+    * *Note:* The `subject_session` is the concatenation of the `Subject` and `MR_session` values from `test_data.csv` (e.g., `Test_Sub_001-Sess_01`).
+* **`metadata.json`**: A file containing your team name, llm_name and any other relevant information.
+
+**Sample Format for `predictions.csv`:**
 | subject_session | age_at_visit |
 | :--- | :--- |
-| Test_Sub_001-Sess_01 | 70.5245 |
-| Test_Sub_002-Sess_01 | 62.3873 |
+| Test_Sub_001-Sess_01 | 66.03828 |
+| Test_Sub_001-Sess_02 | 66.35320 |
+| Test_Sub_002-Sess_01 | 63.15323 |
 
+> 💡 A template is provided at: `data/public/sample_submission.csv`
 
-### 3. Submission via Pull Request
+### 2. Submit via Pull Request
 1.  **Fork** this repository.
-2.  Add your team folder and file.
-3.  Submit a **Pull Request (PR)** to the `main` branch. 
+2.  **Create a folder** named after your team under the `submissions/` directory: `submissions/<your_team_name>/`.
+3.  **Upload** your `predictions.csv` and `metadata.json` into that folder.
+4.  **Open a Pull Request (PR)** to the `main` branch of this repository.
+
+### 3. Automated Scoring
+* **Wait ~1-2 minutes.** Our automated bot will trigger as soon as you open the PR.
+* The bot will calculate your **Mean Absolute Error (MAE)** and post it as a comment directly on your PR!
+* Once your PR is merged, your results will be officially added to the leaderboard.
+
+---
 
 ## 🏆 Leaderboard
-Evaluation is performed automatically using **Mean Absolute Error (MAE)**. Once your PR is merged, the official rankings are updated.
 
-👉 **[View the Live Leaderboard Here](https://bjayadikary.github.io/brain-age-gnn-oasis3/leaderboard.html)**
-
+Evaluation is performed automatically using **Mean Absolute Error (MAE)**. After a PR is merged, the submission is archived in `leaderboard/leaderboard.csv` and updated in the project files.
 
 
 
-
-
-
-
-
-
-
-
-
-
-# GNN Coding Competition Template
-
-This repository provides a **secure, reproducible template** for running a
-Graph Neural Network (GNN) competition that supports **humans and LLMs**
-competing on equal footing.
-
-The design intentionally **does not execute participant code**. Instead,
-participants submit **predictions only**, which are automatically evaluated
-and ranked on a public leaderboard using GitHub Actions.
-
-This makes the competition:
-- Safe (no untrusted code execution)
-- Fully reproducible
-- Suitable for human-vs-LLM evaluation studies
-
----
-
-## 1. Task Overview
-
-**Task:** Node classification on a graph  
-**Input:** Public graph structure and node features  
-**Output:** Predictions for unseen test nodes  
-**Metric:** ROC-AUC (binary classification)
-
-Participants train any GNN or non-GNN model *offline* and submit predictions
-for the test nodes.
-
----
-
-## 2. Repository Structure
-
-```
-.
-├── data/
-│   ├── public/
-│   │   ├── train_edges.csv
-│   │   ├── train_labels.csv
-│   │   ├── val_edges.csv
-│   │   ├── val_labels.csv
-│   │   ├── test_edges.csv
-│   │   ├── test_nodes.csv
-│   │   └── sample_submission.csv
-│   └── private/
-│       └── test_labels.csv   # never committed (used only in CI)
-├── competition/
-│   ├── config.yaml
-│   ├── validate_submission.py
-│   ├── evaluate.py
-│   └── metrics.py
-├── submissions/
-│   ├── README.md
-│   └── inbox/
-├── leaderboard/
-│   ├── leaderboard.csv
-│   └── leaderboard.md
-└── .github/workflows/
-    ├── score_submission.yml
-    └── publish_leaderboard.yml
-```
-
----
-
-## 3. Submission Format
-
-Participants submit a **single CSV file**:
-
-**predictions.csv**
-```
-id,y_pred
-n0001,0.92
-n0002,0.13
-...
-```
-
-Rules:
-- `id` must match exactly the IDs in `test_nodes.csv`
-- One row per test node
-- `y_pred` must be a float in [0,1]
-- No missing or duplicate IDs
-
-A sample is provided in:
-```
-data/public/sample_submission.csv
-```
-
----
-
-## 4. How to Submit
-### 1. Prepare your Submission
-Your submission must be a folder containing:
-- `predictions.csv`: Your model's predictions.
-- `metadata.json`: Information about your team and model.
-
-**`predictions.csv` Format:**
-The file must have exactly these two headers:
-| subject_session | age_at_visit |
-|:----------------|:-------------|
-| Test_Sub_001-Sess_01 | 70.5 |
-| Test_Sub_001-Sess_02 | 72.1 |
-
-### 2. The Folder Structure
-In your forked repository, place your files here:
-`submissions/<your_team_name>/predictions.csv`
-
-### 3. Submit via Pull Request
-1. **Fork** this repository.
-2. **Upload** your folder to the `submissions/` directory.
-3. Open a **Pull Request (PR)** to the main repository.
-4. Wait ~1 minute. A bot will automatically calculate your **MAE** and post it as a comment on your PR!
----
-
-## 5. Leaderboard
-
-After a PR is merged, the submission is added to:
-- `leaderboard/leaderboard.csv`
-- `leaderboard/leaderboard.md`
-
-Rankings are sorted by **descending score**.
-
----
-
-## 6. Rules
-
-- No external or private data
-- No manual labeling of test data
-- No modification of evaluation scripts
-- Unlimited offline training is allowed
-- Only predictions are submitted
-
-Violations may result in disqualification.
-
----
-
-## 7. Human vs LLM Studies
-
-To use this competition for research:
-- Fix a time budget (e.g., 2 hours)
-- Fix a submission budget (e.g., 5 runs)
-- Record metadata fields (`model`, `llm_name`)
-- Compare:
-  - validity rate
-  - best score within K submissions
-  - score vs submission index
-
----
-
-## 8. Citation
-
-If you use this template in academic work, please cite the repository.
-
----
-
-## 9. License
-
-MIT License.
-
-## Interactive Leaderboard (GitHub Pages)
-
-This template includes an interactive leaderboard page inspired by modern benchmark sites.
-
-**Enable GitHub Pages** (Settings → Pages) and set the source to the `main` branch `/docs` folder.
-Then open `https://<your-org>.github.io/<repo>/leaderboard.html`.
+👉 **[View the Live Leaderboard Webpage Here](https://bjayadikary.github.io/brain-age-gnn-oasis3/leaderboard.html)**
