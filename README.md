@@ -121,7 +121,7 @@ print(adj_df.shape)  # Output: (68, 68)
 ## 📝 Submission Instructions
 To protect your model strategy and ensure a fair competition, all submissions must be **encrypted** before being uploaded to GitHub.
 
-### 1️⃣ Prepare Your Results
+### 1. Prepare Your Results
 
 Generate a `predictions.csv` file with **exactly two columns**:
 
