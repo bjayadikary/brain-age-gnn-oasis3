@@ -71,7 +71,7 @@ def evaluate(submission_file_path):
         print(f"ERROR: Submission is missing {len(missing)} IDs. First few: {list(missing)[:3]}")
         return
     
-    merged = pd.merge(true_df, submission_df, on='subject_session', suffixes='_true', '_pred')
+    merged = pd.merge(true_df, submission_df, on='subject_session', suffixes=('_true', '_pred'))
 
     # 6. Calculate Metric
     y_true = merged['age_at_visit_true']
