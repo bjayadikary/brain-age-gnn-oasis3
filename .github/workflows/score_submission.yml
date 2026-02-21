@@ -5,13 +5,14 @@ on:
     paths:
       - 'submissions/**'
       - '!submissions/README.md'
+      - '!submissions/encrypt_submission.py'
 
 jobs:
   evaluate:
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write # This allows the bot to comment
-      contents: write      # This allows the bot to update the leaderboard
+      pull-requests: write
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -25,32 +26,39 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pandas scikit-learn pyyaml
+          pip install pandas scikit-learn pyyaml pycryptodome
 
       - name: Run Evaluation
         id: eval_step
         env:
           TEST_LABELS: ${{ secrets.TEST_LABELS }}
+          RSA_PRIVATE_KEY: ${{ secrets.RSA_PRIVATE_KEY }}
         run: |
-          # 1. Find the predictions.csv in the submissions folder
-          SUBMISSION_FILE=$(find submissions -name "predictions.csv" | head -n 1)
+          # 1. Find the .enc file in the submissions folder
+          SUBMISSION_FILE=$(find submissions -name "*.enc" | head -n 1)
           
-          # 2. Run the script and capture the score
-          # We use 'tee' so we can see the output in the GitHub logs too
+          if [ -z "$SUBMISSION_FILE" ]; then
+            echo "ERROR: No encrypted (.enc) submission file found."
+            exit 1
+          fi
+          
+          # 2. Run the evaluation script
+          # The script now handles decryption internally using the RSA_PRIVATE_KEY env var
           python competition/evaluate.py --file "$SUBMISSION_FILE" | tee evaluation_output.txt
           
-          # 3. Save the score as a variable for the next step
+          # 3. Extract the score
           SCORE=$(grep "SCORE_MAE" evaluation_output.txt | awk '{print $2}')
           echo "score=$SCORE" >> $GITHUB_OUTPUT
 
       - name: Post Score to Pull Request
         uses: mshick/add-pr-comment@v2
-        if: always() # Run this even if evaluation fails so you can see the error
+        if: always()
         with:
           message: |
             ## 🧠 Brain-Age GNN Result
             
+            **Status:** ${{ steps.eval_step.outputs.score != '' && '✅ Success' || '❌ Evaluation Failed' }}
             **Metric:** Mean Absolute Error (MAE)
-            **Your Score:** `${{ steps.eval_step.outputs.score }}`
+            **Your Score:** `${{ steps.eval_step.outputs.score || 'N/A' }}`
             
-            *Note: A lower MAE means better performance.*
+            *Note: If the score is N/A, please check the Action logs for decryption or validation errors.*
