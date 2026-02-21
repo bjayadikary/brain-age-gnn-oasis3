@@ -163,7 +163,7 @@ You must use the provided public key keys/public_key.pem to encrypt your results
 3. **Upload** exactly two files:
     * `predictions.enc` (The encrypted file you generated)
     * `metadata.json`
-4. **Open a Pull Request (PR)**.
+4. Open a Pull Request (PR).
    
 ### 6. Automated Scoring
 * Wait ~1-2 minutes. Bot will use a securely stored private key to decrypt and score your submission.
