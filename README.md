@@ -33,26 +33,26 @@ Each MRI session is represented as a graph:
 
 ```
 .
-└── .github/workflows/
+├── .github/workflows/
 |    ├── score_submission.yml
-|    ├── update_leaderboard.yml
+|    └── update_leaderboard.yml
 |
 ├── competition/
 │   ├── config.yaml
 │   ├── evaluate.py
 │   ├── metrics.py
-│   └── render_leaderboard.py
+│   ├── render_leaderboard.py
 |   └── validate_submission.py
 |
 ├── data/
 │   ├── public/
-│   │   └── adjacency_matrices
-│   │   |    └── OAS30001_d0757.csv
-│   │   |    └── OAS30001_d3132.csv
-│   │   |    └── ...
+│   │   ├── adjacency_matrices
+│   │   |    ├── OAS30001_d0757.csv
+│   │   |    ├── OAS30001_d3132.csv
+│   │   |    ├── ...
 │   │   |
-│   │   └── train_data.csv
-│   │   └── val_data.csv
+│   │   ├── train_data.csv
+│   │   ├── val_data.csv
 │   │   └── test_data.csv
 │   │
 │   └── sample/
@@ -60,7 +60,7 @@ Each MRI session is represented as a graph:
 |
 ├── docs/
 │   ├── leaderboard.css
-│   └── leaderboard.html
+│   ├── leaderboard.html
 │   └── leaderboard.js
 |
 ├── submissions/
@@ -70,7 +70,7 @@ Each MRI session is represented as a graph:
 ├── leaderboard/
 │   ├── leaderboard.csv
 │   └── leaderboard.md
-└── leaderboard.html
+├── leaderboard.html
 └── README.md
 
 ```
