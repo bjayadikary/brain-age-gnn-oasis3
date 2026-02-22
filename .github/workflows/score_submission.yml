@@ -79,10 +79,18 @@ jobs:
           python3 -c "
           import pandas as pd
           df = pd.read_csv('leaderboard/leaderboard.csv')
-          df['MAE'] = pd.to_numeric(df['MAE'], errors='coerce')
-          df = df.dropna(subset=['MAE']).sort_values('MAE').drop_duplicates('Team', keep='first')
-          df['Rank'] = range(1, len(df) + 1)
-          df[['Rank', 'Team', 'MAE']].to_csv('leaderboard/leaderboard.csv', index=False)
+          
+          # Force column names to be lowercase to avoid KeyError
+          df.columns = [c.lower() for c in df.columns]
+          
+          # Use 'mae' and 'team' (lowercase)
+          df['mae'] = pd.to_numeric(df['mae'], errors='coerce')
+          df = df.dropna(subset=['mae']).sort_values('mae').drop_duplicates('team', keep='first')
+          
+          # Re-assign Ranks and capitalize for the final save if you prefer
+          df['rank'] = range(1, len(df) + 1)
+          df.columns = [c.capitalize() for c in df.columns]
+          df.to_csv('leaderboard/leaderboard.csv', index=False)
           "
           
           # Markdown Generation
