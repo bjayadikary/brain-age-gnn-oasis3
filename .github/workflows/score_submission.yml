@@ -58,33 +58,29 @@ jobs:
         env:
           TEAM: ${{ steps.eval_step.outputs.team_name }}
           SCORE: ${{ steps.eval_step.outputs.score }}
+          STIME: "" # Placeholder, will be set in shell
         run: |
+          # 1. Capture time and update ENV for Python
           SUBMISSION_TIME=$(date -u +"%b %d, %H:%M UTC")
-          echo "SUB_TIME=$SUBMISSION_TIME" >> $GITHUB_ENV
+          export STIME="$SUBMISSION_TIME"
 
-          # 1. Update CSV Database
+          # 2. Update CSV Database
           if [ ! -f leaderboard.csv ]; then echo "team,mae,date" > leaderboard.csv; fi
           echo "$TEAM,$SCORE,$SUBMISSION_TIME" >> leaderboard.csv
           
-          # 2. Refine Data and Inject into HTML using Python
+          # 3. Refine Data and Inject into HTML using Python
           python3 -c "
           import pandas as pd
           import re
           import os
 
-          # Load data
+          # Load and Clean
           df = pd.read_csv('leaderboard.csv')
-          
-          # Ensure 'mae' is numeric. If it contains a date string, it becomes NaN
           df['mae'] = pd.to_numeric(df['mae'], errors='coerce')
-          
-          # Drop invalid rows and sort by MAE (best first), keep best per team
           df = df.dropna(subset=['mae']).sort_values('mae').drop_duplicates('team', keep='first')
-          
-          # Save cleaned CSV back
           df.to_csv('leaderboard.csv', index=False)
 
-          # Build HTML Rows
+          # Build HTML
           html_rows = ''
           for i, row in enumerate(df.itertuples(), 1):
               rank = {1:'🥇 1st', 2:'🥈 2nd', 3:'🥉 3rd'}.get(i, f'{i}th')
@@ -94,20 +90,17 @@ jobs:
               with open('leaderboard.html', 'r') as f:
                   content = f.read()
               
-              # Replace Table Body using Anchor Tags
+              # Targeted Regex replacement using Comment Anchors
               content = re.sub(r'.*?', 
                                f'\n{html_rows}', 
                                content, flags=re.DOTALL)
               
-              # Replace Date Badge using Anchor Tags
               new_badge = f'\n<div class=\"badge bg-primary mt-2\">Last Updated: {os.environ.get(\"STIME\")}</div>\n'
               content = re.sub(r'.*?', new_badge, content, flags=re.DOTALL)
               
               with open('leaderboard.html', 'w') as f:
                   f.write(content)
           "
-        env:
-          STIME: $(date -u +"%b %d, %H:%M UTC")
 
       - name: Update Markdown Leaderboard
         run: |
