@@ -11,7 +11,6 @@ on:
     paths:
       - 'submissions/**'
       - '!submissions/README.md'
-      - '!submissions/encrypt_submission.py'
 
 jobs:
   evaluate:
@@ -19,7 +18,6 @@ jobs:
     permissions:
       pull-requests: write
       contents: write
-      statuses: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -40,90 +38,65 @@ jobs:
           TEST_LABELS: ${{ secrets.TEST_LABELS }}
           RSA_PRIVATE_KEY: ${{ secrets.RSA_PRIVATE_KEY }}
         run: |
-          # 1. Find the file and team
+          # Find the encrypted file
           SUBMISSION_FILE=$(find submissions -name "*.enc" | head -n 1)
           if [ -z "$SUBMISSION_FILE" ]; then echo "ERROR: No file found"; exit 1; fi
           TEAM_NAME=$(basename $(dirname "$SUBMISSION_FILE"))
           
-          # 2. Run evaluation
+          # Run the evaluation script
           python competition/evaluate.py --file "$SUBMISSION_FILE" | tee evaluation_output.txt
           
-          # 3. Parse score
+          # Extract score (Assuming evaluate.py prints 'SCORE_MAE <value>')
           SCORE=$(grep "SCORE_MAE" evaluation_output.txt | awk '{print $2}')
-          
-          # 4. CRITICAL: Save to outputs
           echo "score=$SCORE" >> $GITHUB_OUTPUT
           echo "team_name=$TEAM_NAME" >> $GITHUB_OUTPUT
-          
-          # 5. Debug (Check your logs for this!)
-          echo "Debug: Team is $TEAM_NAME and Score is $SCORE"
 
-      - name: Update Leaderboard Data
-        if: steps.eval_step.outputs.score != ''
+      - name: Post Score to PR
+        # This ONLY runs on the Pull Request (Review Phase)
+        if: github.event_name == 'pull_request'
+        uses: mshick/add-pr-comment@v2
+        with:
+          message: |
+            ## 🧠 Brain-Age GNN Submission Result
+            **Team:** `${{ steps.eval_step.outputs.team_name }}`
+            **Score (MAE):** `${{ steps.eval_step.outputs.score || 'Error Computing Score' }}`
+            
+            ---
+            *Note: The leaderboard will only be updated once a maintainer merges this Pull Request.*
+
+      - name: Update Leaderboard (Merge Phase)
+        # This ONLY runs when the code is pushed/merged to main
+        if: github.event_name == 'push' && steps.eval_step.outputs.score != ''
         run: |
           TEAM="${{ steps.eval_step.outputs.team_name }}"
           SCORE="${{ steps.eval_step.outputs.score }}"
-
           mkdir -p leaderboard
           
-          # 1. Ensure CSV exists. If it does, append the new score. 
-          # We put a placeholder '0' for Rank because Python will recalculate it.
-          if [ ! -f leaderboard/leaderboard.csv ]; then 
-            echo "Rank,Team,MAE" > leaderboard/leaderboard.csv
-          fi
+          # CSV Update Logic
+          if [ ! -f leaderboard/leaderboard.csv ]; then echo "Rank,Team,MAE" > leaderboard/leaderboard.csv; fi
           echo "0,$TEAM,$SCORE" >> leaderboard/leaderboard.csv
           
-          # 2. Use Python to Re-Rank everything
           python3 -c "
           import pandas as pd
-          
           df = pd.read_csv('leaderboard/leaderboard.csv')
           df['MAE'] = pd.to_numeric(df['MAE'], errors='coerce')
-          df = df.dropna(subset=['MAE'])
-          
-          # Sort by MAE (lowest best) and keep only the best score per team
-          df = df.sort_values('MAE').drop_duplicates('Team', keep='first')
-          
-          # Re-assign Ranks 1 through N
+          df = df.dropna(subset=['MAE']).sort_values('MAE').drop_duplicates('Team', keep='first')
           df['Rank'] = range(1, len(df) + 1)
-          
-          # Save back to CSV
           df[['Rank', 'Team', 'MAE']].to_csv('leaderboard/leaderboard.csv', index=False)
           "
-
-          # 3. Update the Markdown file
+          
+          # Markdown Generation
           echo "# 🏆 Competition Leaderboard" > leaderboard/LEADERBOARD.md
           echo "Last updated: $(date -u)" >> leaderboard/LEADERBOARD.md
           echo -e "\n| Rank | Team | MAE Score |\n|------|------|-----------|" >> leaderboard/LEADERBOARD.md
-          
-          # Convert the CSV rows into Markdown rows
-          tail -n +2 leaderboard/leaderboard.csv | awk -F, '{print "| " $1 " | " $2 " | " $3 " |"}' >> leaderboard/LEADERBOARD.md
+          tail -n +2 leaderboard/leaderboard.csv | awk -F, '{printf "| %s | %s | %s |\n", $1, $2, $3}' >> leaderboard/LEADERBOARD.md
 
-      - name: Push changes back to main
+      - name: Commit and Push Leaderboard
         if: github.event_name == 'push' && steps.eval_step.outputs.score != ''
         run: |
           git config user.name "Leaderboard Bot"
           git config user.email "actions@github.com"
-          
-          # Stage the changes
           git add leaderboard/
-          
-          # Commit (if there are changes)
-          git commit -m "Update leaderboard: ${{ steps.eval_step.outputs.team_name }}" || exit 0
-          
-          # NEW: Pull the latest changes from main to avoid the 'rejected' error
-          # --rebase keeps the history clean by putting your commit on top
+          git commit -m "Update leaderboard for ${{ steps.eval_step.outputs.team_name }}" || exit 0
           git pull --rebase origin main
-          
-          # Push the merged result
           git push origin HEAD:main
-
-      - name: Post Score to Pull Request
-        uses: mshick/add-pr-comment@v2
-        if: always()
-        with:
-          message: |
-            ## 🧠 Brain-Age GNN Result
-            **Status:** ${{ steps.eval_step.outputs.score != '' && '✅ Success' || '❌ Evaluation Failed' }}
-            **Team:** `${{ steps.eval_step.outputs.team_name }}`
-            **Score (MAE):** `${{ steps.eval_step.outputs.score || 'N/A' }}`
