@@ -95,8 +95,18 @@ jobs:
         run: |
           git config user.name "Leaderboard Bot"
           git config user.email "actions@github.com"
+          
+          # Stage the changes
           git add leaderboard/
-          git commit -m "Update leaderboard: ${{ steps.eval_step.outputs.team_name }}" || echo "No changes"
+          
+          # Commit (if there are changes)
+          git commit -m "Update leaderboard: ${{ steps.eval_step.outputs.team_name }}" || exit 0
+          
+          # NEW: Pull the latest changes from main to avoid the 'rejected' error
+          # --rebase keeps the history clean by putting your commit on top
+          git pull --rebase origin main
+          
+          # Push the merged result
           git push origin HEAD:main
 
       - name: Post Score to Pull Request
