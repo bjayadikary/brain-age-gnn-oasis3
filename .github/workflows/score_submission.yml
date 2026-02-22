@@ -13,7 +13,6 @@ jobs:
     permissions:
       pull-requests: write
       contents: write
-      pull-requests: write
       statuses: write
     steps:
       - name: Checkout code
@@ -27,8 +26,7 @@ jobs:
           python-version: '3.9'
 
       - name: Install dependencies
-        run: |
-          pip install pandas scikit-learn pyyaml pycryptodome
+        run: pip install pandas scikit-learn pyyaml pycryptodome
 
       - name: Run Evaluation
         id: eval_step
@@ -57,11 +55,12 @@ jobs:
 
       - name: Update Leaderboard Files
         if: steps.eval_step.outputs.score != ''
+        env:
+          TEAM: ${{ steps.eval_step.outputs.team_name }}
+          SCORE: ${{ steps.eval_step.outputs.score }}
         run: |
-          run: |
-          TEAM="${{ steps.eval_step.outputs.team_name }}"
-          SCORE="${{ steps.eval_step.outputs.score }}"
           SUBMISSION_TIME=$(date -u +"%b %d, %H:%M UTC")
+          echo "SUB_TIME=$SUBMISSION_TIME" >> $GITHUB_ENV
 
           # 1. Update CSV Database
           if [ ! -f leaderboard.csv ]; then echo "team,mae,date" > leaderboard.csv; fi
@@ -76,14 +75,11 @@ jobs:
           # Load data
           df = pd.read_csv('leaderboard.csv')
           
-          # CLEANUP: Ensure 'mae' is numeric. If it contains a date, it becomes NaN
+          # Ensure 'mae' is numeric. If it contains a date string, it becomes NaN
           df['mae'] = pd.to_numeric(df['mae'], errors='coerce')
           
-          # Drop rows where MAE is invalid
-          df = df.dropna(subset=['mae'])
-          
-          # Sort by MAE (best first) and keep only the best score per team
-          df = df.sort_values('mae').drop_duplicates('team', keep='first')
+          # Drop invalid rows and sort by MAE (best first), keep best per team
+          df = df.dropna(subset=['mae']).sort_values('mae').drop_duplicates('team', keep='first')
           
           # Save cleaned CSV back
           df.to_csv('leaderboard.csv', index=False)
@@ -91,38 +87,27 @@ jobs:
           # Build HTML Rows
           html_rows = ''
           for i, row in enumerate(df.itertuples(), 1):
-              rank = f'{i}th'
-              if i == 1: rank = '🥇 1st'
-              elif i == 2: rank = '🥈 2nd'
-              elif i == 3: rank = '🥉 3rd'
-              
-              html_rows += (
-                  f'<tr>'
-                  f'<td>{rank}</td>'
-                  f'<td>{row.team}</td>'
-                  f'<td class=\"mae-value\">{float(row.mae):.4f}</td>'
-                  f'<td class=\"time-cell\">{row.date}</td>'
-                  f'</tr>\n'
-              )
+              rank = {1:'🥇 1st', 2:'🥈 2nd', 3:'🥉 3rd'}.get(i, f'{i}th')
+              html_rows += f'<tr><td>{rank}</td><td>{row.team}</td><td class=\"mae-value\">{float(row.mae):.4f}</td><td class=\"time-cell\">{row.date}</td></tr>\n'
           
           if os.path.exists('leaderboard.html'):
               with open('leaderboard.html', 'r') as f:
                   content = f.read()
               
-              # Replace Table Body (Fixed RegEx)
+              # Replace Table Body using Anchor Tags
               content = re.sub(r'.*?', 
                                f'\n{html_rows}', 
                                content, flags=re.DOTALL)
               
-              # Replace Date Badge (Fixed RegEx)
-              new_badge = f'\n<div class=\"badge bg-primary mt-2\">Last Updated: {os.environ.get(\"SUB_TIME\")}</div>\n'
+              # Replace Date Badge using Anchor Tags
+              new_badge = f'\n<div class=\"badge bg-primary mt-2\">Last Updated: {os.environ.get(\"STIME\")}</div>\n'
               content = re.sub(r'.*?', new_badge, content, flags=re.DOTALL)
               
               with open('leaderboard.html', 'w') as f:
                   f.write(content)
           "
         env:
-          SUB_TIME: ${{ env.SUBMISSION_TIME }}
+          STIME: $(date -u +"%b %d, %H:%M UTC")
 
       - name: Update Markdown Leaderboard
         run: |
@@ -131,7 +116,6 @@ jobs:
           echo "" >> LEADERBOARD.md
           echo "| Rank | Team | MAE Score | Submission Time |" >> LEADERBOARD.md
           echo "|------|------|-----------|-----------------|" >> LEADERBOARD.md
-          # Re-read the cleaned CSV to build the Markdown table
           if [ -f leaderboard.csv ]; then
             tail -n +2 leaderboard.csv | sort -t, -k2 -g | awk -F, '{print "| " NR " | " $1 " | " $2 " | " $3 " |"}' >> LEADERBOARD.md
           fi
@@ -150,10 +134,6 @@ jobs:
         with:
           message: |
             ## 🧠 Brain-Age GNN Result
-            
             **Status:** ${{ steps.eval_step.outputs.score != '' && '✅ Success' || '❌ Evaluation Failed' }}
             **Team:** `${{ steps.eval_step.outputs.team_name }}`
-            **Metric:** Mean Absolute Error (MAE)
-            **Your Score:** `${{ steps.eval_step.outputs.score || 'N/A' }}`
-            
-            *The leaderboard has been updated. Check [leaderboard.html](./leaderboard.html) for rankings!*
+            **Score (MAE):** `${{ steps.eval_step.outputs.score || 'N/A' }}`
