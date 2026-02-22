@@ -1,6 +1,12 @@
 name: Score Submission
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'submissions/**'
+      - '!submissions/README.md'
   pull_request:
     paths:
       - 'submissions/**'
@@ -34,98 +40,54 @@ jobs:
           TEST_LABELS: ${{ secrets.TEST_LABELS }}
           RSA_PRIVATE_KEY: ${{ secrets.RSA_PRIVATE_KEY }}
         run: |
-          # 1. Find the .enc file
           SUBMISSION_FILE=$(find submissions -name "*.enc" | head -n 1)
           if [ -z "$SUBMISSION_FILE" ]; then echo "ERROR: No file found"; exit 1; fi
           
-          # 2. Extract Team Name
           TEAM_NAME=$(basename $(dirname "$SUBMISSION_FILE"))
           echo "team_name=$TEAM_NAME" >> $GITHUB_OUTPUT
 
-          # 3. Run evaluation
           python competition/evaluate.py --file "$SUBMISSION_FILE" | tee evaluation_output.txt
           SCORE=$(grep "SCORE_MAE" evaluation_output.txt | awk '{print $2}')
           echo "score=$SCORE" >> $GITHUB_OUTPUT
 
-      - name: Update Leaderboard Files
+      - name: Update Leaderboard Data
         if: steps.eval_step.outputs.score != ''
-        env:
-          TEAM: ${{ steps.eval_step.outputs.team_name }}
-          SCORE: ${{ steps.eval_step.outputs.score }}
-          # Combine STIME here instead of creating a second env block
-          STIME: $(date -u +"%b %d, %H:%M UTC")
         run: |
-          # 1. Capture time for the shell environment
+          TEAM="${{ steps.eval_step.outputs.team_name }}"
+          SCORE="${{ steps.eval_step.outputs.score }}"
           SUBMISSION_TIME=$(date -u +"%b %d, %H:%M UTC")
-          export STIME="$SUBMISSION_TIME"
 
-          # 2. Update CSV inside the leaderboard folder
           mkdir -p leaderboard
+          
+          # 1. Update CSV (Append new result)
           if [ ! -f leaderboard/leaderboard.csv ]; then echo "team,mae,date" > leaderboard/leaderboard.csv; fi
           echo "$TEAM,$SCORE,$SUBMISSION_TIME" >> leaderboard/leaderboard.csv
           
-          # 3. Python Injection (Updates docs/leaderboard.html)
+          # 2. Process CSV with Python (Sort and keep best score per team)
           python3 -c "
           import pandas as pd
-          import re
-          import os
-
-          # Data Processing (Leaderboard folder)
           df = pd.read_csv('leaderboard/leaderboard.csv')
           df['mae'] = pd.to_numeric(df['mae'], errors='coerce')
-          # Keep lowest MAE for each team
           df = df.dropna(subset=['mae']).sort_values('mae').drop_duplicates('team', keep='first')
           df.to_csv('leaderboard/leaderboard.csv', index=False)
-
-          # Row Generation
-          html_rows = ''
-          for i, row in enumerate(df.itertuples(), 1):
-              rank = {1:'🥇 1st', 2:'🥈 2nd', 3:'🥉 3rd'}.get(i, f'{i}th')
-              html_rows += f'<tr><td>{rank}</td><td>{row.team}</td><td>GNN</td><td class=\"mae-value\">{float(row.mae):.4f}</td><td class=\"time-cell\">{row.date}</td><td>Official Submission</td></tr>\n'
-          
-          # HTML Injection (Docs folder)
-          html_path = 'docs/leaderboard.html'
-          if os.path.exists(html_path):
-              with open(html_path, 'r') as f:
-                  content = f.read()
-              
-              # Replace Table Body
-              content = re.sub(r'.*?', 
-                               f'\n{html_rows}', 
-                               content, flags=re.DOTALL)
-          
-              # Replace Date Badge
-              badge_html = f'\n<div class=\"badge bg-primary mt-2\">Last Updated: {os.environ.get(\"STIME\")}</div>\n'
-              content = re.sub(r'.*?', 
-                               badge_html, 
-                               content, flags=re.DOTALL)
-
-              with open(html_path, 'w') as f:
-                  f.write(content)
           "
-      - name: Update Markdown Leaderboard
-        run: |
-          # Create Markdown inside the leaderboard folder
-          mkdir -p leaderboard
+
+          # 3. Regenerate Markdown LEADERBOARD.md
           echo "# 🏆 Competition Leaderboard" > leaderboard/LEADERBOARD.md
           echo "Last updated: $(date -u)" >> leaderboard/LEADERBOARD.md
           echo "" >> leaderboard/LEADERBOARD.md
           echo "| Rank | Team | MAE Score | Submission Time |" >> leaderboard/LEADERBOARD.md
           echo "|------|------|-----------|-----------------|" >> leaderboard/LEADERBOARD.md
-          if [ -f leaderboard/leaderboard.csv ]; then
-            tail -n +2 leaderboard/leaderboard.csv | sort -t, -k2 -g | awk -F, '{print "| " NR " | " $1 " | " $2 " | " $3 " |"}' >> leaderboard/LEADERBOARD.md
-          fi
+          
+          # This line takes the sorted CSV and formats it into the Markdown table
+          tail -n +2 leaderboard/leaderboard.csv | awk -F, '{print "| " NR " | " $1 " | " $2 " | " $3 " |"}' >> leaderboard/LEADERBOARD.md
 
       - name: Push changes back to main
+        if: github.event_name == 'push' && steps.eval_step.outputs.score != ''
         run: |
           git config user.name "Leaderboard Bot"
           git config user.email "actions@github.com"
-          
-          # Clean up mistakenly created files in root
-          rm -f leaderboard.csv leaderboard.html LEADERBOARD.md
-          
-          # Add the relevant folders
-          git add leaderboard/ docs/leaderboard.html
+          git add leaderboard/
           git commit -m "Update leaderboard: ${{ steps.eval_step.outputs.team_name }}" || echo "No changes"
           git push origin HEAD:main
 
