@@ -49,6 +49,7 @@ jobs:
         env:
           TEAM: ${{ steps.eval_step.outputs.team_name }}
           SCORE: ${{ steps.eval_step.outputs.score }}
+          STIME: "" # Placeholder, will be set in shell
         run: |
           # 1. Capture time
           SUBMISSION_TIME=$(date -u +"%b %d, %H:%M UTC")
@@ -95,8 +96,6 @@ jobs:
               with open(html_path, 'w') as f:
                   f.write(content)
           "
-        env:
-          STIME: $(date -u +"%b %d, %H:%M UTC")
 
       - name: Update Markdown Leaderboard
         run: |
