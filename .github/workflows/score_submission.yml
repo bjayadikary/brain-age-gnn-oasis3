@@ -59,37 +59,46 @@ jobs:
           echo "Debug: Team is $TEAM_NAME and Score is $SCORE"
 
       - name: Update Leaderboard Data
-        if: steps.eval_step.outputs.score != ''
+if: steps.eval_step.outputs.score != ''
         run: |
           TEAM="${{ steps.eval_step.outputs.team_name }}"
           SCORE="${{ steps.eval_step.outputs.score }}"
-          SUBMISSION_TIME=$(date -u +"%b %d, %H:%M UTC")
 
           mkdir -p leaderboard
           
-          # 1. Update CSV (Append new result)
-          if [ ! -f leaderboard/leaderboard.csv ]; then echo "team,mae,date" > leaderboard/leaderboard.csv; fi
-          echo "$TEAM,$SCORE,$SUBMISSION_TIME" >> leaderboard/leaderboard.csv
+          # 1. Ensure CSV exists. If it does, append the new score. 
+          # We put a placeholder '0' for Rank because Python will recalculate it.
+          if [ ! -f leaderboard/leaderboard.csv ]; then 
+            echo "Rank,Team,MAE" > leaderboard/leaderboard.csv
+          fi
+          echo "0,$TEAM,$SCORE" >> leaderboard/leaderboard.csv
           
-          # 2. Process CSV with Python (Sort and keep best score per team)
+          # 2. Use Python to Re-Rank everything
           python3 -c "
           import pandas as pd
+          
           df = pd.read_csv('leaderboard/leaderboard.csv')
-          df['mae'] = pd.to_numeric(df['mae'], errors='coerce')
-          df = df.dropna(subset=['mae']).sort_values('mae').drop_duplicates('team', keep='first')
-          df.to_csv('leaderboard/leaderboard.csv', index=False)
+          df['MAE'] = pd.to_numeric(df['MAE'], errors='coerce')
+          df = df.dropna(subset=['MAE'])
+          
+          # Sort by MAE (lowest best) and keep only the best score per team
+          df = df.sort_values('MAE').drop_duplicates('Team', keep='first')
+          
+          # Re-assign Ranks 1 through N
+          df['Rank'] = range(1, len(df) + 1)
+          
+          # Save back to CSV
+          df[['Rank', 'Team', 'MAE']].to_csv('leaderboard/leaderboard.csv', index=False)
           "
 
-          # 3. Regenerate Markdown LEADERBOARD.md
+          # 3. Update the Markdown file
           echo "# 🏆 Competition Leaderboard" > leaderboard/LEADERBOARD.md
           echo "Last updated: $(date -u)" >> leaderboard/LEADERBOARD.md
-          echo "" >> leaderboard/LEADERBOARD.md
-          echo "| Rank | Team | MAE Score | Submission Time |" >> leaderboard/LEADERBOARD.md
-          echo "|------|------|-----------|-----------------|" >> leaderboard/LEADERBOARD.md
+          echo -e "\n| Rank | Team | MAE Score |\n|------|------|-----------|" >> leaderboard/LEADERBOARD.md
           
-          # This line takes the sorted CSV and formats it into the Markdown table
-          tail -n +2 leaderboard/leaderboard.csv | awk -F, '{print "| " NR " | " $1 " | " $2 " | " $3 " |"}' >> leaderboard/LEADERBOARD.md
-
+          # Convert the CSV rows into Markdown rows
+          tail -n +2 leaderboard/leaderboard.csv | awk -F, '{print "| " $1 " | " $2 " | " $3 " |"}' >> leaderboard/LEADERBOARD.md
+          
       - name: Push changes back to main
         if: github.event_name == 'push' && steps.eval_step.outputs.score != ''
         run: |
