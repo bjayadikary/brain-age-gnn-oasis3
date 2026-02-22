@@ -13,6 +13,8 @@ jobs:
     permissions:
       pull-requests: write
       contents: write
+      pull-requests: write
+      statuses: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -130,7 +132,9 @@ jobs:
           echo "| Rank | Team | MAE Score | Submission Time |" >> LEADERBOARD.md
           echo "|------|------|-----------|-----------------|" >> LEADERBOARD.md
           # Re-read the cleaned CSV to build the Markdown table
-          tail -n +2 leaderboard.csv | sort -t, -k2 -g | awk -F, '{print "| " NR " | " $1 " | " $2 " | " $3 " |"}' >> LEADERBOARD.md
+          if [ -f leaderboard.csv ]; then
+            tail -n +2 leaderboard.csv | sort -t, -k2 -g | awk -F, '{print "| " NR " | " $1 " | " $2 " | " $3 " |"}' >> LEADERBOARD.md
+          fi
 
       - name: Push changes back to main
         run: |
@@ -139,7 +143,7 @@ jobs:
           git add leaderboard.csv LEADERBOARD.md leaderboard.html
           git commit -m "Update leaderboard: ${{ steps.eval_step.outputs.team_name }}" || echo "No changes to commit"
           git push origin HEAD:main
-          
+
       - name: Post Score to Pull Request
         uses: mshick/add-pr-comment@v2
         if: always()
