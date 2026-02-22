@@ -56,35 +56,37 @@ jobs:
       - name: Update Leaderboard Files
         if: steps.eval_step.outputs.score != ''
         run: |
+          run: |
           TEAM="${{ steps.eval_step.outputs.team_name }}"
           SCORE="${{ steps.eval_step.outputs.score }}"
-          # Capture current time in UTC
           SUBMISSION_TIME=$(date -u +"%b %d, %H:%M UTC")
 
-          # 1. Update CSV (Database)
-          if [ ! -f leaderboard.csv ]; then
-            echo "team,mae,date" > leaderboard.csv
-          fi
+          # 1. Update CSV Database
+          if [ ! -f leaderboard.csv ]; then echo "team,mae,date" > leaderboard.csv; fi
           echo "$TEAM,$SCORE,$SUBMISSION_TIME" >> leaderboard.csv
           
-          # Sort CSV by MAE (ascending) and keep only the best score per team
-          sort -t, -k2 -g leaderboard.csv | awk -F, '!seen[$1]++' > leaderboard.tmp && mv leaderboard.tmp leaderboard.csv
-
-          # 2. Update Markdown (Summary)
-          echo "# 🏆 Competition Leaderboard" > LEADERBOARD.md
-          echo "Last updated: $SUBMISSION_TIME" >> LEADERBOARD.md
-          echo "" >> LEADERBOARD.md
-          echo "| Rank | Team | MAE Score | Submission Time |" >> LEADERBOARD.md
-          echo "|------|------|-----------|-----------------|" >> LEADERBOARD.md
-          awk -F, 'NR>1 {print "| " NR-1 " | " $1 " | " $2 " | " $3 " |"}' leaderboard.csv >> LEADERBOARD.md
-
-          # 3. Inject into HTML using Python
+          # 2. Refine Data and Inject into HTML using Python
           python3 -c "
           import pandas as pd
           import re
+          import os
+
+          # Load data
+          df = pd.read_csv('leaderboard.csv')
           
-          df = pd.read_csv('leaderboard.csv').sort_values('mae')
+          # CLEANUP: Ensure 'mae' is numeric. If it contains a date, it becomes NaN
+          df['mae'] = pd.to_numeric(df['mae'], errors='coerce')
           
+          # Drop rows where MAE is invalid
+          df = df.dropna(subset=['mae'])
+          
+          # Sort by MAE (best first) and keep only the best score per team
+          df = df.sort_values('mae').drop_duplicates('team', keep='first')
+          
+          # Save cleaned CSV back
+          df.to_csv('leaderboard.csv', index=False)
+
+          # Build HTML Rows
           html_rows = ''
           for i, row in enumerate(df.itertuples(), 1):
               rank = f'{i}th'
@@ -101,29 +103,43 @@ jobs:
                   f'</tr>\n'
               )
           
-          with open('leaderboard.html', 'r') as f:
-              content = f.read()
-          
-          # Replace Table Body
-          content = re.sub(r'.*?', 
-                           f'\n{html_rows}', 
-                           content, flags=re.DOTALL)
-          
-          # Replace Date Badge
-          new_badge = f'\n<div class=\"badge bg-primary mt-2\">Last Updated: {SUBMISSION_TIME}</div>\n'
-          content = re.sub(r'.*?', new_badge, content, flags=re.DOTALL)
-          
-          with open('leaderboard.html', 'w') as f:
-              f.write(content)
+          if os.path.exists('leaderboard.html'):
+              with open('leaderboard.html', 'r') as f:
+                  content = f.read()
+              
+              # Replace Table Body (Fixed RegEx)
+              content = re.sub(r'.*?', 
+                               f'\n{html_rows}', 
+                               content, flags=re.DOTALL)
+              
+              # Replace Date Badge (Fixed RegEx)
+              new_badge = f'\n<div class=\"badge bg-primary mt-2\">Last Updated: {os.environ.get(\"SUB_TIME\")}</div>\n'
+              content = re.sub(r'.*?', new_badge, content, flags=re.DOTALL)
+              
+              with open('leaderboard.html', 'w') as f:
+                  f.write(content)
           "
+        env:
+          SUB_TIME: ${{ env.SUBMISSION_TIME }}
 
-          # 4. Push changes back to main
+      - name: Update Markdown Leaderboard
+        run: |
+          echo "# 🏆 Competition Leaderboard" > LEADERBOARD.md
+          echo "Last updated: $(date -u)" >> LEADERBOARD.md
+          echo "" >> LEADERBOARD.md
+          echo "| Rank | Team | MAE Score | Submission Time |" >> LEADERBOARD.md
+          echo "|------|------|-----------|-----------------|" >> LEADERBOARD.md
+          # Re-read the cleaned CSV to build the Markdown table
+          tail -n +2 leaderboard.csv | sort -t, -k2 -g | awk -F, '{print "| " NR " | " $1 " | " $2 " | " $3 " |"}' >> LEADERBOARD.md
+
+      - name: Push changes back to main
+        run: |
           git config user.name "Leaderboard Bot"
           git config user.email "actions@github.com"
           git add leaderboard.csv LEADERBOARD.md leaderboard.html
-          git commit -m "Update leaderboard: $TEAM ($SCORE)"
+          git commit -m "Update leaderboard: ${{ steps.eval_step.outputs.team_name }}" || echo "No changes to commit"
           git push origin HEAD:main
-
+          
       - name: Post Score to Pull Request
         uses: mshick/add-pr-comment@v2
         if: always()
