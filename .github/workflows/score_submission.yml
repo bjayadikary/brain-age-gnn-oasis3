@@ -34,12 +34,15 @@ jobs:
           TEST_LABELS: ${{ secrets.TEST_LABELS }}
           RSA_PRIVATE_KEY: ${{ secrets.RSA_PRIVATE_KEY }}
         run: |
+          # 1. Find the .enc file
           SUBMISSION_FILE=$(find submissions -name "*.enc" | head -n 1)
           if [ -z "$SUBMISSION_FILE" ]; then echo "ERROR: No file found"; exit 1; fi
           
+          # 2. Extract Team Name
           TEAM_NAME=$(basename $(dirname "$SUBMISSION_FILE"))
           echo "team_name=$TEAM_NAME" >> $GITHUB_OUTPUT
 
+          # 3. Run evaluation
           python competition/evaluate.py --file "$SUBMISSION_FILE" | tee evaluation_output.txt
           SCORE=$(grep "SCORE_MAE" evaluation_output.txt | awk '{print $2}')
           echo "score=$SCORE" >> $GITHUB_OUTPUT
@@ -51,16 +54,16 @@ jobs:
           SCORE: ${{ steps.eval_step.outputs.score }}
           STIME: "" # Placeholder, will be set in shell
         run: |
-          # 1. Capture time
+          # 1. Capture time for Python environment
           SUBMISSION_TIME=$(date -u +"%b %d, %H:%M UTC")
           export STIME="$SUBMISSION_TIME"
 
-          # 2. Update CSV (Strictly inside leaderboard folder)
+          # 2. Update CSV inside the leaderboard folder
           mkdir -p leaderboard
           if [ ! -f leaderboard/leaderboard.csv ]; then echo "team,mae,date" > leaderboard/leaderboard.csv; fi
           echo "$TEAM,$SCORE,$SUBMISSION_TIME" >> leaderboard/leaderboard.csv
           
-          # 3. Python Injection (Safe Mode: Touches only anchors)
+          # 3. Python Injection (Safe Mode: Uses specific comment anchors)
           python3 -c "
           import pandas as pd
           import re
@@ -78,7 +81,7 @@ jobs:
               rank = {1:'🥇 1st', 2:'🥈 2nd', 3:'🥉 3rd'}.get(i, f'{i}th')
               html_rows += f'<tr><td>{rank}</td><td>{row.team}</td><td class=\"mae-value\">{float(row.mae):.4f}</td><td class=\"time-cell\">{row.date}</td></tr>\n'
           
-          # HTML Injection
+          # HTML Injection using Comment Anchors
           html_path = 'leaderboard/leaderboard.html'
           if os.path.exists(html_path):
               with open(html_path, 'r') as f:
@@ -99,11 +102,15 @@ jobs:
 
       - name: Update Markdown Leaderboard
         run: |
-          echo "# 🏆 Competition Leaderboard" > LEADERBOARD.md
-          echo "| Rank | Team | MAE Score | Submission Time |" >> LEADERBOARD.md
-          echo "|------|------|-----------|-----------------|" >> LEADERBOARD.md
+          # Create Markdown inside the leaderboard folder
+          mkdir -p leaderboard
+          echo "# 🏆 Competition Leaderboard" > leaderboard/LEADERBOARD.md
+          echo "Last updated: $(date -u)" >> leaderboard/LEADERBOARD.md
+          echo "" >> leaderboard/LEADERBOARD.md
+          echo "| Rank | Team | MAE Score | Submission Time |" >> leaderboard/LEADERBOARD.md
+          echo "|------|------|-----------|-----------------|" >> leaderboard/LEADERBOARD.md
           if [ -f leaderboard/leaderboard.csv ]; then
-            tail -n +2 leaderboard/leaderboard.csv | sort -t, -k2 -g | awk -F, '{print "| " NR " | " $1 " | " $2 " | " $3 " |"}' >> LEADERBOARD.md
+            tail -n +2 leaderboard/leaderboard.csv | sort -t, -k2 -g | awk -F, '{print "| " NR " | " $1 " | " $2 " | " $3 " |"}' >> leaderboard/LEADERBOARD.md
           fi
 
       - name: Push changes back to main
@@ -112,9 +119,10 @@ jobs:
           git config user.email "actions@github.com"
           
           # Clean up mistakenly created files in root
-          rm -f leaderboard.csv leaderboard.html 
+          rm -f leaderboard.csv leaderboard.html LEADERBOARD.md
           
-          git add leaderboard/ LEADERBOARD.md
+          # Add everything inside the leaderboard folder
+          git add leaderboard/
           git commit -m "Update leaderboard: ${{ steps.eval_step.outputs.team_name }}" || echo "No changes"
           git push origin HEAD:main
 
