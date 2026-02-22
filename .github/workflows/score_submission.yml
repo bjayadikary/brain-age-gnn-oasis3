@@ -52,8 +52,10 @@ jobs:
         env:
           TEAM: ${{ steps.eval_step.outputs.team_name }}
           SCORE: ${{ steps.eval_step.outputs.score }}
+          # Combine STIME here instead of creating a second env block
+          STIME: $(date -u +"%b %d, %H:%M UTC")
         run: |
-          # 1. Capture time
+          # 1. Capture time for the shell environment
           SUBMISSION_TIME=$(date -u +"%b %d, %H:%M UTC")
           export STIME="$SUBMISSION_TIME"
 
@@ -87,21 +89,18 @@ jobs:
               with open(html_path, 'r') as f:
                   content = f.read()
               
-              # Replace Table Body using comment anchors
+              # Replace Table Body using the comment anchors we added
               content = re.sub(r'.*?', 
                                f'\n{html_rows}', 
                                content, flags=re.DOTALL)
               
-              # Replace Date Badge using comment anchors
+              # Replace Date Badge using the comment anchors we added
               badge_html = f'\n<div class=\"badge bg-primary mt-2\">Last Updated: {os.environ.get(\"STIME\")}</div>\n'
               content = re.sub(r'.*?', badge_html, content, flags=re.DOTALL)
               
               with open(html_path, 'w') as f:
                   f.write(content)
           "
-        env:
-          STIME: $(date -u +"%b %d, %H:%M UTC")
-
       - name: Update Markdown Leaderboard
         run: |
           # Create Markdown inside the leaderboard folder
