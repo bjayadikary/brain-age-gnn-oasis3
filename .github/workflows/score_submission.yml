@@ -52,9 +52,8 @@ jobs:
         env:
           TEAM: ${{ steps.eval_step.outputs.team_name }}
           SCORE: ${{ steps.eval_step.outputs.score }}
-          STIME: "" # Placeholder, will be set in shell
         run: |
-          # 1. Capture time for Python environment
+          # 1. Capture time
           SUBMISSION_TIME=$(date -u +"%b %d, %H:%M UTC")
           export STIME="$SUBMISSION_TIME"
 
@@ -63,15 +62,16 @@ jobs:
           if [ ! -f leaderboard/leaderboard.csv ]; then echo "team,mae,date" > leaderboard/leaderboard.csv; fi
           echo "$TEAM,$SCORE,$SUBMISSION_TIME" >> leaderboard/leaderboard.csv
           
-          # 3. Python Injection (Safe Mode: Uses specific comment anchors)
+          # 3. Python Injection (Updates docs/leaderboard.html)
           python3 -c "
           import pandas as pd
           import re
           import os
 
-          # Data Processing
+          # Data Processing (Leaderboard folder)
           df = pd.read_csv('leaderboard/leaderboard.csv')
           df['mae'] = pd.to_numeric(df['mae'], errors='coerce')
+          # Keep lowest MAE for each team
           df = df.dropna(subset=['mae']).sort_values('mae').drop_duplicates('team', keep='first')
           df.to_csv('leaderboard/leaderboard.csv', index=False)
 
@@ -79,26 +79,28 @@ jobs:
           html_rows = ''
           for i, row in enumerate(df.itertuples(), 1):
               rank = {1:'🥇 1st', 2:'🥈 2nd', 3:'🥉 3rd'}.get(i, f'{i}th')
-              html_rows += f'<tr><td>{rank}</td><td>{row.team}</td><td class=\"mae-value\">{float(row.mae):.4f}</td><td class=\"time-cell\">{row.date}</td></tr>\n'
+              html_rows += f'<tr><td>{rank}</td><td>{row.team}</td><td>GNN</td><td class=\"mae-value\">{float(row.mae):.4f}</td><td class=\"time-cell\">{row.date}</td><td>Official Submission</td></tr>\n'
           
-          # HTML Injection using Comment Anchors
-          html_path = 'leaderboard/leaderboard.html'
+          # HTML Injection (Docs folder)
+          html_path = 'docs/leaderboard.html'
           if os.path.exists(html_path):
               with open(html_path, 'r') as f:
                   content = f.read()
               
-              # Replace Table Body
+              # Replace Table Body using comment anchors
               content = re.sub(r'.*?', 
                                f'\n{html_rows}', 
                                content, flags=re.DOTALL)
               
-              # Replace Date Badge
+              # Replace Date Badge using comment anchors
               badge_html = f'\n<div class=\"badge bg-primary mt-2\">Last Updated: {os.environ.get(\"STIME\")}</div>\n'
               content = re.sub(r'.*?', badge_html, content, flags=re.DOTALL)
               
               with open(html_path, 'w') as f:
                   f.write(content)
           "
+        env:
+          STIME: $(date -u +"%b %d, %H:%M UTC")
 
       - name: Update Markdown Leaderboard
         run: |
@@ -121,8 +123,8 @@ jobs:
           # Clean up mistakenly created files in root
           rm -f leaderboard.csv leaderboard.html LEADERBOARD.md
           
-          # Add everything inside the leaderboard folder
-          git add leaderboard/
+          # Add the relevant folders
+          git add leaderboard/ docs/leaderboard.html
           git commit -m "Update leaderboard: ${{ steps.eval_step.outputs.team_name }}" || echo "No changes"
           git push origin HEAD:main
 
