@@ -38,15 +38,26 @@ jobs:
           TEST_LABELS: ${{ secrets.TEST_LABELS }}
           RSA_PRIVATE_KEY: ${{ secrets.RSA_PRIVATE_KEY }}
         run: |
-          # Find the encrypted file
-          SUBMISSION_FILE=$(find submissions -name "*.enc" | head -n 1)
-          if [ -z "$SUBMISSION_FILE" ]; then echo "ERROR: No file found"; exit 1; fi
+          # 1. Get the path of the .enc file specifically from this PR/Push
+          # This avoids picking up old folders like 'test_submission_6'
+          SUBMISSION_FILE=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep 'submissions/.*\.enc$' | head -n 1)
+          
+          # 2. Fallback: If git diff is empty (like on a first push), use the find method
+          if [ -z "$SUBMISSION_FILE" ]; then
+            SUBMISSION_FILE=$(find submissions -name "*.enc" | head -n 1)
+          fi
+          
+          if [ -z "$SUBMISSION_FILE" ]; then echo "ERROR: No submission file found"; exit 1; fi
+          
+          # 3. Extract Team Name from the folder containing the file
           TEAM_NAME=$(basename $(dirname "$SUBMISSION_FILE"))
           
-          # Run the evaluation script
+          echo "Processing submission for team: $TEAM_NAME"
+          
+          # 4. Run evaluation
           python competition/evaluate.py --file "$SUBMISSION_FILE" | tee evaluation_output.txt
           
-          # Extract score (Assuming evaluate.py prints 'SCORE_MAE <value>')
+          # 5. Extract score
           SCORE=$(grep "SCORE_MAE" evaluation_output.txt | awk '{print $2}')
           echo "score=$SCORE" >> $GITHUB_OUTPUT
           echo "team_name=$TEAM_NAME" >> $GITHUB_OUTPUT
