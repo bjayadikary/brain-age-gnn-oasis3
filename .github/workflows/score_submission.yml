@@ -59,7 +59,7 @@ jobs:
           echo "Debug: Team is $TEAM_NAME and Score is $SCORE"
 
       - name: Update Leaderboard Data
-if: steps.eval_step.outputs.score != ''
+        if: steps.eval_step.outputs.score != ''
         run: |
           TEAM="${{ steps.eval_step.outputs.team_name }}"
           SCORE="${{ steps.eval_step.outputs.score }}"
@@ -98,7 +98,7 @@ if: steps.eval_step.outputs.score != ''
           
           # Convert the CSV rows into Markdown rows
           tail -n +2 leaderboard/leaderboard.csv | awk -F, '{print "| " $1 " | " $2 " | " $3 " |"}' >> leaderboard/LEADERBOARD.md
-          
+
       - name: Push changes back to main
         if: github.event_name == 'push' && steps.eval_step.outputs.score != ''
         run: |
