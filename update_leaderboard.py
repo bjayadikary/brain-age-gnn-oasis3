@@ -3,32 +3,32 @@ import pandas as pd
 from io import StringIO
 
 def calculate_mae(ground_truth_df, prediction_df):
-    # Ensure we are joining on the ID column
     merged = pd.merge(ground_truth_df, prediction_df, on='subject_session', suffixes=('_true', '_pred'))
-    
     if merged.empty:
-        print("Error: No matching subject_session IDs found between GT and Submission.")
         return None
-    
-    # Use the suffixed names created by the merge
     mae = (merged['age_at_visit_true'] - merged['age_at_visit_pred']).abs().mean()
     return round(mae, 4)
 
-# 1. Load Ground Truth from Environment Secret
+# 1. Load Ground Truth
 gt_data = os.getenv('TEST_LABELS')
 if not gt_data:
     print("Error: TEST_LABELS secret not found.")
     exit(1)
 gt_df = pd.read_csv(StringIO(gt_data))
 
-leaderboard_data = []
+# 2. LOAD EXISTING DATA FIRST (Persistent History)
+csv_path = 'leaderboard/leaderboard.csv'
+if os.path.exists(csv_path):
+    existing_df = pd.read_csv(csv_path)
+    leaderboard_data = existing_df.to_dict('records')
+else:
+    leaderboard_data = []
 
-# 2. Scan submissions
+# 3. Scan for NEW submissions
 submissions_dir = 'submissions'
 if os.path.exists(submissions_dir):
     for team_name in os.listdir(submissions_dir):
         team_path = os.path.join(submissions_dir, team_name)
-        # Note: Your script checks for predictions.csv
         pred_file = os.path.join(team_path, 'predictions.csv')
         
         if os.path.isdir(team_path) and os.path.exists(pred_file):
@@ -36,19 +36,31 @@ if os.path.exists(submissions_dir):
                 pred_df = pd.read_csv(pred_file)
                 score = calculate_mae(gt_df, pred_df)
                 if score is not None:
+                    # Append new finding without checking for duplicates
                     leaderboard_data.append({"Team": team_name, "MAE": score})
             except Exception as e:
                 print(f"Error processing {team_name}: {e}")
 
-# 3. Create Leaderboard
+# 4. Create Leaderboard (Allowing multiple entries per team)
 if leaderboard_data:
-    # Sort by MAE (Ascending) and then Team name
-    leaderboard_df = pd.DataFrame(leaderboard_data).sort_values(by=["MAE", "Team"])
+    df = pd.DataFrame(leaderboard_data)
     
-    # Assign Sequential Ranks
-    leaderboard_df['Rank'] = range(1, len(leaderboard_df) + 1)
-    leaderboard_df = leaderboard_df[['Rank', 'Team', 'MAE']]
+    # Standardize column names
+    df.columns = [c.capitalize() for c in df.columns]
+    
+    # Ensure MAE is numeric and sort (lowest MAE is still better)
+    df['Mae'] = pd.to_numeric(df['Mae'], errors='coerce')
+    df = df.dropna(subset=['Mae']).sort_values(by=["Mae", "Team"])
+    
+    # 5. DENSE RANKING
+    # This will give the same rank to identical scores
+    df['Rank'] = df['Mae'].rank(method='dense').astype(int)
+    
+    # Final column order
+    leaderboard_df = df[['Rank', 'Team', 'Mae']]
+    leaderboard_df.columns = ['Rank', 'Team', 'MAE']
 
+    # Formatting for Markdown display
     def format_rank(rank):
         if rank == 1: return "🥇 1st"
         if rank == 2: return "🥈 2nd"
@@ -58,17 +70,16 @@ if leaderboard_data:
     display_df = leaderboard_df.copy()
     display_df['Rank'] = display_df['Rank'].apply(format_rank)
 
-    # 4. Save to CSV and Markdown (UPDATED TO UPPERCASE)
+    # 6. Save Files
     os.makedirs('leaderboard', exist_ok=True)
-    leaderboard_df.to_csv('leaderboard/leaderboard.csv', index=False)
+    leaderboard_df.to_csv(csv_path, index=False)
     
-    # CHANGED TO LEADERBOARD.md
     with open('leaderboard/LEADERBOARD.md', 'w') as f:
-        f.write("# 🏆 Leaderboard\n\n" + display_df.to_markdown(index=False))
+        f.write("# 🏆 Full Competition History\n\n" + display_df.to_markdown(index=False))
 
-    # 5. Generate HTML
+    # 7. Generate HTML
     html_table = display_df.to_html(classes='table table-hover text-center', index=False, escape=False)
-    
+
     html_content = f"""
     <!DOCTYPE html>
     <html lang="en">

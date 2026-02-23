@@ -66,7 +66,6 @@ jobs:
           echo "team_name=$TEAM_NAME" >> $GITHUB_OUTPUT
 
       - name: Post Score to PR
-        # ONLY runs during the Review Phase (PR)
         if: github.event_name == 'pull_request'
         uses: mshick/add-pr-comment@v2
         with:
@@ -79,34 +78,38 @@ jobs:
             *Note: The leaderboard will only be updated once a maintainer merges this Pull Request.*
 
       - name: Commit and Push Leaderboard (Merge Phase)
-        # ONLY runs during the Record-Keeping Phase (Merge to Main)
         if: github.event_name == 'push' && steps.eval_step.outputs.score != ''
         run: |
           git config user.name "Leaderboard Bot"
           git config user.email "actions@github.com"
           
+          # 1. PERSISTENT SYNC: Pull existing data instead of resetting
+          git fetch origin main
+          git checkout main
+          git pull origin main --rebase
+          
           TEAM="${{ steps.eval_step.outputs.team_name }}"
           SCORE="${{ steps.eval_step.outputs.score }}"
 
-          # 1. Ensure we have the latest data before editing
-          git fetch origin main
-          git checkout main
-          git reset --hard origin/main
-          
-          # 2. Update CSV
+          # 2. Append new result to the existing CSV
           mkdir -p leaderboard
           if [ ! -f leaderboard/leaderboard.csv ]; then echo "Rank,Team,MAE" > leaderboard/leaderboard.csv; fi
           echo "0,$TEAM,$SCORE" >> leaderboard/leaderboard.csv
           
-          # 3. Process Ranks with Python (Dense Ranking: 1, 1, 2, 3)
+          # 3. Process Ranks and REMOVE DUPLICATES (Keep best score per team)
           python3 -c "
           import pandas as pd
           df = pd.read_csv('leaderboard/leaderboard.csv')
           df.columns = [c.lower() for c in df.columns]
           df['mae'] = pd.to_numeric(df['mae'], errors='coerce')
-          df = df.dropna(subset=['mae']).sort_values('mae')
+          
+          # Drop duplicates: keeps only the lowest MAE for each team
+          df = df.dropna(subset=['mae']).sort_values('mae').drop_duplicates('team', keep='first')
+          
+          # Dense Ranking (1, 1, 2, 3)
           df['rank'] = df['mae'].rank(method='dense').astype(int)
-          df = df[['rank', 'team', 'mae']]
+          df = df[['rank', 'team', 'mae']].sort_values('rank')
+          
           df.columns = [c.capitalize() for c in df.columns]
           df.to_csv('leaderboard/leaderboard.csv', index=False)
           "
@@ -115,10 +118,8 @@ jobs:
           echo "# 🏆 Competition Leaderboard" > leaderboard/LEADERBOARD.md
           echo "Last updated: $(date -u) (UTC)" >> leaderboard/LEADERBOARD.md
           echo -e "\n| Rank | Team | MAE Score |\n|------|------|-----------|" >> leaderboard/LEADERBOARD.md
-          
-          # This version uses single quotes for awk, which is safer in YAML
           tail -n +2 leaderboard/leaderboard.csv | awk -F, '{printf "| %s | %s | %s |\n", $1, $2, $3}' >> leaderboard/LEADERBOARD.md
-                    
+          
           # 5. Push clean update
           git add leaderboard/
           git commit -m "Update leaderboard for $TEAM" || exit 0
