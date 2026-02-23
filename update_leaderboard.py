@@ -124,6 +124,11 @@ if leaderboard_data:
     </html>
     """
     
-    with open('leaderboard.html', 'w') as f:
+    # NEW: Ensure the docs directory exists
+    os.makedirs('docs', exist_ok=True)
+    
+    # NEW: Save to docs/leaderboard.html instead of the root
+    with open('docs/leaderboard.html', 'w') as f:
         f.write(html_content)
-    print("Files updated successfully.")
+        
+    print("Files updated successfully. HTML saved to docs/leaderboard.html")

@@ -83,44 +83,20 @@ jobs:
           git config user.name "Leaderboard Bot"
           git config user.email "actions@github.com"
           
-          # 1. PERSISTENT SYNC: Pull existing data instead of resetting
+          # 1. Sync with the latest main to avoid push conflicts
           git fetch origin main
           git checkout main
           git pull origin main --rebase
           
-          TEAM="${{ steps.eval_step.outputs.team_name }}"
-          SCORE="${{ steps.eval_step.outputs.score }}"
-
-          # 2. Append new result to the existing CSV
-          mkdir -p leaderboard
-          if [ ! -f leaderboard/leaderboard.csv ]; then echo "Rank,Team,MAE" > leaderboard/leaderboard.csv; fi
-          echo "0,$TEAM,$SCORE" >> leaderboard/leaderboard.csv
+          # 2. Run your dedicated Python script
+          # This script handles the CSV, LEADERBOARD.md, and docs/leaderboard.html
+          python update_leaderboard.py
           
-          # 3. Process Ranks and REMOVE DUPLICATES (Keep best score per team)
-          python3 -c "
-          import pandas as pd
-          df = pd.read_csv('leaderboard/leaderboard.csv')
-          df.columns = [c.lower() for c in df.columns]
-          df['mae'] = pd.to_numeric(df['mae'], errors='coerce')
-          
-          # Drop duplicates: keeps only the lowest MAE for each team
-          df = df.dropna(subset=['mae']).sort_values('mae').drop_duplicates('team', keep='first')
-          
-          # Dense Ranking (1, 1, 2, 3)
-          df['rank'] = df['mae'].rank(method='dense').astype(int)
-          df = df[['rank', 'team', 'mae']].sort_values('rank')
-          
-          df.columns = [c.capitalize() for c in df.columns]
-          df.to_csv('leaderboard/leaderboard.csv', index=False)
-          "
-
-          # 4. Update Markdown Table
-          echo "# 🏆 Competition Leaderboard" > leaderboard/LEADERBOARD.md
-          echo "Last updated: $(date -u) (UTC)" >> leaderboard/LEADERBOARD.md
-          echo -e "\n| Rank | Team | MAE Score |\n|------|------|-----------|" >> leaderboard/LEADERBOARD.md
-          tail -n +2 leaderboard/leaderboard.csv | awk -F, '{printf "| %s | %s | %s |\n", $1, $2, $3}' >> leaderboard/LEADERBOARD.md
-          
-          # 5. Push clean update
+          # 3. Add all updated folders
           git add leaderboard/
-          git commit -m "Update leaderboard for $TEAM" || exit 0
+          git add docs/
+          
+          # 4. Commit and Push
+          # The || exit 0 prevents the action from failing if there are no changes
+          git commit -m "Auto-update leaderboard [skip ci]" || exit 0
           git push origin main
