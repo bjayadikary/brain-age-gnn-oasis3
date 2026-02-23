@@ -38,26 +38,27 @@ jobs:
           TEST_LABELS: ${{ secrets.TEST_LABELS }}
           RSA_PRIVATE_KEY: ${{ secrets.RSA_PRIVATE_KEY }}
         run: |
-          # 1. Get the path of the .enc file specifically from this PR/Push
-          # This avoids picking up old folders like 'test_submission_6'
-          SUBMISSION_FILE=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep 'submissions/.*\.enc$' | head -n 1)
-          
-          # 2. Fallback: If git diff is empty (like on a first push), use the find method
-          if [ -z "$SUBMISSION_FILE" ]; then
+          # 1. Use git diff to find ONLY the .enc file added/changed in this specific PR
+          # We look at the difference between the base branch (main) and the current PR head
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            SUBMISSION_FILE=$(git diff --name-only origin/main...HEAD | grep 'submissions/.*\.enc$' | head -n 1)
+          else
             SUBMISSION_FILE=$(find submissions -name "*.enc" | head -n 1)
           fi
-          
-          if [ -z "$SUBMISSION_FILE" ]; then echo "ERROR: No submission file found"; exit 1; fi
-          
-          # 3. Extract Team Name from the folder containing the file
+
+          if [ -z "$SUBMISSION_FILE" ]; then 
+            echo "ERROR: No submission file found in this PR."
+            exit 1
+          fi
+
+          # 2. Derive team name from the folder path
           TEAM_NAME=$(basename $(dirname "$SUBMISSION_FILE"))
+          echo "Detected Team: $TEAM_NAME"
           
-          echo "Processing submission for team: $TEAM_NAME"
-          
-          # 4. Run evaluation
+          # 3. Run evaluation
           python competition/evaluate.py --file "$SUBMISSION_FILE" | tee evaluation_output.txt
           
-          # 5. Extract score
+          # 4. Extract score
           SCORE=$(grep "SCORE_MAE" evaluation_output.txt | awk '{print $2}')
           echo "score=$SCORE" >> $GITHUB_OUTPUT
           echo "team_name=$TEAM_NAME" >> $GITHUB_OUTPUT
