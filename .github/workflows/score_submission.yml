@@ -115,8 +115,10 @@ jobs:
           echo "# 🏆 Competition Leaderboard" > leaderboard/LEADERBOARD.md
           echo "Last updated: $(date -u) (UTC)" >> leaderboard/LEADERBOARD.md
           echo -e "\n| Rank | Team | MAE Score |\n|------|------|-----------|" >> leaderboard/LEADERBOARD.md
-          tail -n +2 leaderboard/leaderboard.csv | awk -F, '{printf "| %s | %s | %s |\n", \$1, \$2, \$3}' >> leaderboard/LEADERBOARD.md
           
+          # This version uses single quotes for awk, which is safer in YAML
+          tail -n +2 leaderboard/leaderboard.csv | awk -F, '{printf "| %s | %s | %s |\n", $1, $2, $3}' >> leaderboard/LEADERBOARD.md
+                    
           # 5. Push clean update
           git add leaderboard/
           git commit -m "Update leaderboard for $TEAM" || exit 0
