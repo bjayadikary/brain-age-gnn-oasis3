@@ -9,4 +9,5 @@
 |      1 | test_submission_29 | 5.61988 |
 |      1 | test_submission_30 | 5.61988 |
 |      2 | test_team          | 5.61988 |
+|      2 | test_team          | 5.61988 |
 |      3 | test_team          | 5.6199  |
