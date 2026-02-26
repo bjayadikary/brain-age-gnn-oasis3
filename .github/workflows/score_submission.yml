@@ -33,29 +33,40 @@ jobs:
           TEST_LABELS: ${{ secrets.TEST_LABELS }}
           RSA_PRIVATE_KEY: ${{ secrets.RSA_PRIVATE_KEY }}
         run: |
-          # 1. Detect the file and extract Team Name
-          FILE=$(git diff --name-only origin/main...HEAD | grep 'submissions/.*\.enc$' | head -n 1)
+          # 1. Get ALL changed .enc files, ordered by most recent commit first
+          ALL_FILES=$(git log --name-only --format="" origin/main...HEAD | grep 'submissions/.*\.enc$' | uniq)
+          
+          # 2. Select the absolute latest one (top of the list)
+          FILE=$(echo "$ALL_FILES" | head -n 1)
           
           if [ -z "$FILE" ]; then
             echo "No .enc file detected."
             exit 1
           fi
 
-          # Extract filename without path and extension (e.g., submissions/team_alpha.enc -> team_alpha)
+          # 3. Check for multiples to add a note to the PR
+          COUNT=$(echo "$ALL_FILES" | wc -l)
+          if [ "$COUNT" -gt 1 ]; then
+            MULTIPLE_NOTE="⚠️ **Note:** Multiple submission files detected in this PR. Only the most recent file (\`$FILE\`) was evaluated."
+          else
+            MULTIPLE_NOTE=""
+          fi
+          echo "multi_note=$MULTIPLE_NOTE" >> $GITHUB_OUTPUT
+
+          # 4. Extract Team Name
           FILENAME=$(basename "$FILE")
           TEAM_NAME="${FILENAME%.*}"
           echo "team_name=$TEAM_NAME" >> $GITHUB_OUTPUT
           
-          # 2. Run the evaluation
+          # 5. Run the evaluation
           python competition/evaluate.py --file "$FILE" | tee out.txt
           
-          # 3. Extract score and force 8 decimal precision using 'printf'
+          # 6. Extract score
           RAW_SCORE=$(grep "SCORE_MAE" out.txt | awk '{print $2}')
           
           if [ -z "$RAW_SCORE" ] || [ "$RAW_SCORE" == "None" ]; then
             echo "score=Error Computing Score" >> $GITHUB_OUTPUT
           else
-            # Formats the number to 8 decimal places
             FORMATTED_SCORE=$(printf "%.8f" $RAW_SCORE)
             echo "score=$FORMATTED_SCORE" >> $GITHUB_OUTPUT
           fi
@@ -69,6 +80,8 @@ jobs:
             
             **Team:** `${{ steps.eval.outputs.team_name }}`
             **Score (MAE):** `${{ steps.eval.outputs.score }}`
+            
+            ${{ steps.eval.outputs.multi_note }}
             
             ---
             *Note: The official leaderboard will update automatically once this Pull Request is merged into the main branch.*
