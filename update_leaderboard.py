@@ -7,7 +7,7 @@ def calculate_mae(ground_truth_df, prediction_df):
     if merged.empty:
         return None
     mae = (merged['age_at_visit_true'] - merged['age_at_visit_pred']).abs().mean()
-    return round(mae, 8)
+    return round(float(mae), 8)
 
 # 1. Load Ground Truth
 gt_data = os.getenv('TEST_LABELS')
@@ -16,22 +16,35 @@ if not gt_data:
     exit(1)
 gt_df = pd.read_csv(StringIO(gt_data))
 
-# 2. LOAD EXISTING DATA FIRST (Persistent History)
+# 2. LOAD EXISTING DATA (Persistent History)
 csv_path = 'leaderboard/leaderboard.csv'
+existing_teams = set()
+leaderboard_data = []
+
 if os.path.exists(csv_path):
     existing_df = pd.read_csv(csv_path)
-    leaderboard_data = existing_df.to_dict('records')
-else:
-    leaderboard_data = []
+    # Standardize headers to find 'TEAM' regardless of original casing
+    existing_df.columns = existing_df.columns.str.strip().str.upper()
+    
+    if 'TEAM' in existing_df.columns:
+        # Cache existing names for the strict check in Section 3
+        existing_teams = set(existing_df['TEAM'].astype(str).str.upper().unique())
+        leaderboard_data = existing_df.to_dict('records')
 
-# 3. Scan for NEW submissions
+# 3. Scan for NEW submissions with STRICT duplicate check
 submissions_dir = 'submissions'
 if os.path.exists(submissions_dir):
     for team_name in os.listdir(submissions_dir):
-        # --- NEW CHECK FOR FUTURE SUBMISSIONS ---
-        if not team_name or team_name.lower() == 'nan':
-            continue  # Skip if the folder name is empty or literally named 'nan'
-        # -----------------------------------------
+        if not team_name or team_name.lower() == 'nan' or team_name.startswith('.'):
+            continue
+
+        # --- THE STRICT CHECK ---
+        # Blocks the merge if the folder name is already in the CSV history
+        if team_name.upper() in existing_teams:
+            print(f"❌ ERROR: Team '{team_name}' already exists in the leaderboard.")
+            print("To update, delete the old entry from leaderboard.csv or use a unique name.")
+            exit(1) 
+        # ------------------------
 
         team_path = os.path.join(submissions_dir, team_name)
         pred_file = os.path.join(team_path, 'predictions.csv')
@@ -41,7 +54,6 @@ if os.path.exists(submissions_dir):
                 pred_df = pd.read_csv(pred_file)
                 score = calculate_mae(gt_df, pred_df)
                 if score is not None:
-                    # Append strictly with the team_name we just verified
                     leaderboard_data.append({"TEAM": team_name, "MAE": score})
             except Exception as e:
                 print(f"Error processing {team_name}: {e}")
@@ -50,22 +62,23 @@ if os.path.exists(submissions_dir):
 if leaderboard_data:
     df = pd.DataFrame(leaderboard_data)
     
-    # 1. Standardize all column names to uppercase immediately
+    # Standardize column names
     df.columns = df.columns.str.strip().str.upper()
     
-    # 2. THE FIX: Collapse duplicate columns (merges 'TEAM' and 'TEAM')
-    # This combines the "old" Team column and the "new" TEAM column into one.
+    # Collapse duplicate columns (merges 'Team' and 'TEAM')
     df = df.groupby(level=0, axis=1).first()
 
-    # 3. Clean up: Drop rows that are still missing a Team name
+    # Clean up and force numeric
     df = df.dropna(subset=['TEAM'])
-
-    # 4. Force MAE to be numeric and Sort
     df['MAE'] = pd.to_numeric(df['MAE'], errors='coerce')
+
+    # DEDUPLICATION: Cleans up any existing duplicates in the history
+    df = df.sort_values(by=['MAE']).drop_duplicates(subset=['TEAM'], keep='first')
+
+    # Final Sort and Rank
     df = df.dropna(subset=['MAE']).sort_values(by=["MAE", "TEAM"])
-    
-    # 5. Rank and Finalize
     df['RANK'] = df['MAE'].rank(method='dense').astype(int)
+    
     leaderboard_df = df[['RANK', 'TEAM', 'MAE']]
     leaderboard_df.columns = ['Rank', 'Team', 'MAE']
 
@@ -73,13 +86,18 @@ if leaderboard_data:
     os.makedirs('leaderboard', exist_ok=True)
     leaderboard_df.to_csv(csv_path, index=False)
     
-    # This line triggered the 'tabulate' error - step 1 fixes this!
     with open('leaderboard/LEADERBOARD.md', 'w') as f:
         f.write("# 🏆 Full Competition History\n\n" + leaderboard_df.to_markdown(index=False))
 
-    # 6. Generate HTML for GitHub Pages (Moving to docs/)
+    # 6. Generate HTML for GitHub Pages (docs/ folder)
     os.makedirs('docs', exist_ok=True)
-    html_table = leaderboard_df.to_html(classes='table table-hover text-center', index=False)
+    
+    # Format MAE to show 8 decimals in the web view
+    html_table = leaderboard_df.to_html(
+        classes='table table-hover text-center', 
+        index=False,
+        formatters={'MAE': lambda x: f"{x:.8f}"}
+    )
 
     html_content = f"""
     <!DOCTYPE html>
@@ -112,8 +130,7 @@ if leaderboard_data:
     </body>
     </html>
     """
-    # Changed filename to docs/leaderboard.html
     with open('docs/leaderboard.html', 'w') as f:
         f.write(html_content)
     
-    print("Leaderboard and HTML (in docs/) updated successfully.")        
+    print("Leaderboard and HTML updated successfully.")
