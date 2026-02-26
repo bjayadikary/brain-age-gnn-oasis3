@@ -33,26 +33,31 @@ jobs:
           TEST_LABELS: ${{ secrets.TEST_LABELS }}
           RSA_PRIVATE_KEY: ${{ secrets.RSA_PRIVATE_KEY }}
         run: |
-          # Detect the changed .enc file in the PR
+          # 1. Detect the file and extract Team Name
           FILE=$(git diff --name-only origin/main...HEAD | grep 'submissions/.*\.enc$' | head -n 1)
           
           if [ -z "$FILE" ]; then
-            echo "No .enc file detected in submissions/ folder."
+            echo "No .enc file detected."
             exit 1
           fi
+
+          # Extract filename without path and extension (e.g., submissions/team_alpha.enc -> team_alpha)
+          FILENAME=$(basename "$FILE")
+          TEAM_NAME="${FILENAME%.*}"
+          echo "team_name=$TEAM_NAME" >> $GITHUB_OUTPUT
           
-          echo "Processing file: $FILE"
-          
-          # Run the evaluation script and capture the MAE score
+          # 2. Run the evaluation
           python competition/evaluate.py --file "$FILE" | tee out.txt
           
-          # Extract the score from the output line "SCORE_MAE: X.XXXX"
-          SCORE=$(grep "SCORE_MAE" out.txt | awk '{print $2}')
+          # 3. Extract score and force 8 decimal precision using 'printf'
+          RAW_SCORE=$(grep "SCORE_MAE" out.txt | awk '{print $2}')
           
-          if [ -z "$SCORE" ]; then
-            echo "score=Error: Could not calculate MAE" >> $GITHUB_OUTPUT
+          if [ -z "$RAW_SCORE" ] || [ "$RAW_SCORE" == "None" ]; then
+            echo "score=Error Computing Score" >> $GITHUB_OUTPUT
           else
-            echo "score=$SCORE" >> $GITHUB_OUTPUT
+            # Formats the number to 8 decimal places
+            FORMATTED_SCORE=$(printf "%.8f" $RAW_SCORE)
+            echo "score=$FORMATTED_SCORE" >> $GITHUB_OUTPUT
           fi
 
       - name: Post Score to PR
@@ -62,6 +67,7 @@ jobs:
           message: |
             ## 🧠 Brain-Age GNN Submission Result
             
+            **Team:** `${{ steps.eval.outputs.team_name }}`
             **Score (MAE):** `${{ steps.eval.outputs.score }}`
             
             ---
