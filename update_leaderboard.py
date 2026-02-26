@@ -93,29 +93,27 @@ changes = get_git_file_info()
 # Check for tampering (Modified or Deleted files in submissions/)
 tampered = [c['path'] for c in changes if c['status'] != 'A']
 if tampered:
-    print(f"❌ SECURITY ERROR: The following existing files were tampered with: {tampered}")
-    print("Leaderboard update aborted.")
+    print(f"❌ SECURITY ERROR: Tampering detected: {tampered}")
     exit(1)
 
-# Get only newly added files
-new_submissions = [c['path'] for c in changes if c['status'] == 'A']
+# Get only newly added files (these are already dictionaries from get_git_file_info)
+new_submissions = [c for c in changes if c['status'] == 'A']
 
 if not new_submissions:
-    print("ℹ️ No new submissions found in this push. Recalculating leaderboard from existing files...")
-    # Fallback to scanning folder if manually triggered or first run
-    new_submissions = [os.path.join(r, f) for r, d, fs in os.walk("submissions") for f in fs if f.endswith(".enc")]
+    print("ℹ️ No new submissions found in last commit. Scanning folder...")
+    # Fallback: Scan folder and create dictionaries with current time
+    all_files = [os.path.join(r, f) for r, d, fs in os.walk("submissions") for f in fs if f.endswith(".enc")]
+    now_ts = pd.Timestamp.now().strftime('%Y-%m-%d %H:%M UTC')
+    new_submissions = [{'path': f, 'sub_time': now_ts} for f in all_files]
 
-# If multiple new files, pick the latest one by git commit time
+# If multiple new files, pick the latest one
 if len(new_submissions) > 1:
-    print(f"⚠️ Multiple new files found: {new_submissions}. Selecting the most recent...")
-    latest_file_cmd = 'git log --diff-filter=A --format="%ct %H" --name-only HEAD^..HEAD | awk \'NF==2 {t=$1; next} /\.enc$/ {print t, $0}\' | sort -nr | head -n 1'
-    latest_output = subprocess.check_output(latest_file_cmd, shell=True).decode('utf-8')
-    selected_file = latest_output.split()[-1]
-    print(f"✅ Selected latest: {selected_file}")
-    target_files = [selected_file]
+    # Sort by sub_time and take the most recent
+    new_submissions.sort(key=lambda x: x['sub_time'], reverse=True)
+    target_files = [new_submissions[0]]
 else:
     target_files = new_submissions
-
+    
 # --- 3. PROCESSING ---
 leaderboard_path = 'leaderboard/leaderboard.csv'
 if os.path.exists(leaderboard_path):
