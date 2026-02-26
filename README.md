@@ -67,16 +67,14 @@ Each MRI session is represented as a graph:
 │    └──public_key.pem               # Use this key during encryption step
 │
 ├── submissions/
-│   ├── <team_name>/                 # Your encrypted submission goes here
-│   │   ├── predictions.enc
-│   │   └── metadata.json
-│   └── encrypt_submission.py        # Script for participants to encrypt their submission results
+│   ├── <team_name>.enc              # Your encrypted prediction file
+│   └── encrypt_submission.py        # Script for participants to encrypt their submission file
 │
 ├── leaderboard/
 │   ├── leaderboard.csv
 │   └── leaderboard.md
 │
-├── leaderboard.html
+├── 
 └── README.md
 
 ```
@@ -133,11 +131,11 @@ Generate a `predictions.csv` file with **exactly two columns**:
 
 #### 📄 Sample Format for `predictions.csv`
 
-| subject_session        | age_at_visit |
-| :--------------------- | :----------- |
-| Test_Sub_001-Sess_01   | 66.03828     |
-| Test_Sub_001-Sess_02   | 66.35320     |
-| Test_Sub_002-Sess_01   | 63.15323     |
+|    subject_session     |  age_at_visit   |
+| :--------------------- | :-------------- |
+| Test_Sub_001-Sess_01   | 66.03822358     |
+| Test_Sub_001-Sess_02   | 66.35320381     |
+| Test_Sub_002-Sess_01   | 63.15323790     |
 
 > 💡 A template is provided at: `data/public/sample_submission.csv`
 
