@@ -82,7 +82,7 @@ jobs:
             FORMATTED_SCORE=$(printf "%.8f" $RAW_SCORE)
             echo "score=$FORMATTED_SCORE" >> $GITHUB_OUTPUT
           fi
-          
+
       - name: Post Score to PR
         uses: mshick/add-pr-comment@v2
         if: always()
@@ -94,3 +94,6 @@ jobs:
             **Score (MAE):** `${{ steps.eval.outputs.score }}`
             
             ${{ steps.eval.outputs.multi_note }}
+
+            ---
+            📌 **Note:** The leaderboard will be updated after this PR is merged into `main`.
