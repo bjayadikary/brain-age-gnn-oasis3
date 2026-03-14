@@ -40,24 +40,29 @@ jobs:
           git checkout pr_branch -- submissions/
 
           # 2. Find submission file(s) changed relative to main
-          CHANGED_FILES=$(git diff --name-only origin/main...HEAD submissions/*.enc | grep -v "sample_submission.enc")
-          NUM_CHANGED=$(echo "$CHANGED_FILES" | wc -l)
+          # Use -- to let git handle the glob (avoids bash expansion crash)
+          CHANGED_FILES=$(git diff --name-only origin/main...pr_branch -- 'submissions/*.enc' \
+            | grep -v "sample_submission.enc" || true)
+
+          # Fix: use -z to properly check for empty string
+          if [ -z "$CHANGED_FILES" ]; then
+              NUM_CHANGED=0
+          else
+              NUM_CHANGED=$(echo "$CHANGED_FILES" | wc -l)
+          fi
 
           if [ "$NUM_CHANGED" -eq 0 ]; then
-              # No new submission
               FILE=""
               echo "multi_note=⚠️ No submission detected in this PR." >> $GITHUB_OUTPUT
           elif [ "$NUM_CHANGED" -eq 1 ]; then
-              # Exactly one submission changed, evaluate it
               FILE="$CHANGED_FILES"
               echo "multi_note=✅ Evaluating: \`$FILE\`" >> $GITHUB_OUTPUT
           else
-              # More than one submission changed → warning
               FILE=""
               echo "multi_note=⚠️ Multiple submissions detected! Only one submission per PR is allowed." >> $GITHUB_OUTPUT
           fi
 
-          # Extract team name if a file was selected
+          # 3. Extract team name
           if [ -n "$FILE" ]; then
               FILENAME=$(basename "$FILE")
               TEAM_NAME="${FILENAME%.*}"
@@ -66,21 +71,20 @@ jobs:
               echo "team_name=Unknown" >> $GITHUB_OUTPUT
           fi
 
+          # 4. Score
           if [ -n "$FILE" ]; then
-            # 4. Score
-            python competition/evaluate.py --file "$FILE" | tee out.txt
-            RAW_SCORE=$(grep "SCORE_MAE" out.txt | awk '{print $2}')
-            
-            if [ -z "$RAW_SCORE" ] || [ "$RAW_SCORE" == "None" ]; then
-              echo "score=Error" >> $GITHUB_OUTPUT
-            else
-              FORMATTED_SCORE=$(printf "%.8f" $RAW_SCORE)
-              echo "score=$FORMATTED_SCORE" >> $GITHUB_OUTPUT
-            fi
+              python competition/evaluate.py --file "$FILE" | tee out.txt
+              RAW_SCORE=$(grep "SCORE_MAE" out.txt | awk '{print $2}')
+              if [ -z "$RAW_SCORE" ] || [ "$RAW_SCORE" == "None" ]; then
+                  echo "score=Error" >> $GITHUB_OUTPUT
+              else
+                  FORMATTED_SCORE=$(printf "%.8f" $RAW_SCORE)
+                  echo "score=$FORMATTED_SCORE" >> $GITHUB_OUTPUT
+              fi
           else
-            echo "Score Not Evaluated" >> $GITHUB_OUTPUT
+              echo "score=Not Evaluated" >> $GITHUB_OUTPUT
           fi
-
+          
       - name: Post Score to PR
         uses: mshick/add-pr-comment@v2
         if: always()
